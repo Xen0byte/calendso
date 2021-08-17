@@ -13,7 +13,7 @@
     "prepare": "husky install"
   },
   "dependencies": {
-    "@headlessui/react": "^1.0.0",
+    "@headlessui/react": "^1.4.0",
     "@heroicons/react": "^1.0.1",
     "@jitsu/sdk-js": "^2.0.1",
     "@prisma/client": "^2.23.0",

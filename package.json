@@ -94,7 +94,7 @@
     "tsdav": "1.0.6",
     "tslog": "^3.2.1",
     "uuid": "^8.3.2",
-    "zod": "^3.8.2"
+    "zod": "^3.11.6"
   },
   "devDependencies": {
     "@microsoft/microsoft-graph-types-beta": "0.15.0-preview",

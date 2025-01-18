@@ -1,4 +1,4 @@
-import { Dispatch, SetStateAction } from "react";
+import type { Dispatch, SetStateAction } from "react";
 
 import { useLocale } from "@calcom/lib/hooks/useLocale";
 import { HttpError } from "@calcom/lib/http-error";
@@ -15,11 +15,11 @@ interface IDeleteDialog {
 export const DeleteDialog = (props: IDeleteDialog) => {
   const { t } = useLocale();
   const { isOpenDialog, setIsOpenDialog, workflowId, additionalFunction } = props;
-  const utils = trpc.useContext();
+  const utils = trpc.useUtils();
 
   const deleteMutation = trpc.viewer.workflows.delete.useMutation({
     onSuccess: async () => {
-      await utils.viewer.workflows.list.invalidate();
+      await utils.viewer.workflows.filteredList.invalidate();
       additionalFunction();
       showToast(t("workflow_deleted_successfully"), "success");
       setIsOpenDialog(false);
@@ -30,13 +30,17 @@ export const DeleteDialog = (props: IDeleteDialog) => {
         showToast(message, "error");
         setIsOpenDialog(false);
       }
+      if (err.data?.code === "UNAUTHORIZED") {
+        const message = `${err.data.code}: You are not authorized to delete this workflow`;
+        showToast(message, "error");
+      }
     },
   });
 
   return (
     <Dialog open={isOpenDialog} onOpenChange={setIsOpenDialog}>
       <ConfirmationDialogContent
-        isLoading={deleteMutation.isLoading}
+        isPending={deleteMutation.isPending}
         variety="danger"
         title={t("delete_workflow")}
         confirmBtnText={t("confirm_delete_workflow")}

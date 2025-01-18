@@ -121,6 +121,7 @@ declare module "ical.js" {
     public static fromString(str: string): Time;
     public static fromJSDate(aDate: Date | null, useUTC: boolean): Time;
     public static fromData(aData: TimeJsonData): Time;
+    public static fromDateTimeString(aDate: string): Time;
 
     public now(): Time;
 
@@ -167,6 +168,7 @@ declare module "ical.js" {
     public isNegative: boolean;
     public icalclass: string;
     public icaltype: string;
+    public toSeconds(): number;
   }
 
   export class RecurExpansion {

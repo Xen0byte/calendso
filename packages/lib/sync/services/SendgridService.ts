@@ -1,7 +1,9 @@
 import logger from "@calcom/lib/logger";
 
-import Sendgrid, { SendgridFieldOptions, SendgridNewContact } from "../../Sendgrid";
-import ISyncService, { ConsoleUserInfoType, WebUserInfoType } from "../ISyncService";
+import type { SendgridFieldOptions, SendgridNewContact } from "../../Sendgrid";
+import Sendgrid from "../../Sendgrid";
+import type { ConsoleUserInfoType, WebUserInfoType } from "../ISyncService";
+import type ISyncService from "../ISyncService";
 import SyncServiceCore from "../ISyncService";
 
 // Cal.com Custom Contact Fields
@@ -18,7 +20,7 @@ const serviceName = "sendgrid_service";
 export default class SendgridService extends SyncServiceCore implements ISyncService {
   protected declare service: Sendgrid;
   constructor() {
-    super(serviceName, Sendgrid, logger.getChildLogger({ prefix: [`[[sync] ${serviceName}`] }));
+    super(serviceName, Sendgrid, logger.getSubLogger({ prefix: [`[[sync] ${serviceName}`] }));
   }
 
   upsert = async (user: WebUserInfoType | ConsoleUserInfoType) => {

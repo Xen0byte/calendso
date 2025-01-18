@@ -1,10 +1,11 @@
+import BaseTable from "./BaseTable";
+
 export const CallToActionTable = (props: { children: React.ReactNode }) => (
-  <table>
+  <BaseTable border="0" style={{ verticalAlign: "top" }} width="100%">
     <tbody>
       <tr>
         <td
           align="center"
-          bgcolor="#292929"
           role="presentation"
           style={{
             border: "none",
@@ -13,12 +14,11 @@ export const CallToActionTable = (props: { children: React.ReactNode }) => (
             // eslint-disable-next-line @typescript-eslint/ban-ts-comment
             // @ts-ignore
             msoPaddingAlt: "10px 25px",
-            background: "#292929",
           }}
           valign="middle">
           {props.children}
         </td>
       </tr>
     </tbody>
-  </table>
+  </BaseTable>
 );

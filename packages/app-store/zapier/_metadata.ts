@@ -7,20 +7,17 @@ export const metadata = {
   description: _package.description,
   installed: true,
   category: "automation",
-  imageSrc: "/api/app-store/zapier/icon.svg",
-  logo: "/api/app-store/zapier/icon.svg",
+  categories: ["automation"],
+  logo: "icon.svg",
   publisher: "Cal.com",
-  rating: 0,
-  reviews: 0,
   slug: "zapier",
   title: "Zapier",
-  trending: true,
   type: "zapier_automation",
   url: "https://cal.com/apps/zapier",
   variant: "automation",
-  verified: true,
   email: "help@cal.com",
   dirName: "zapier",
+  isOAuth: false,
 } as AppMeta;
 
 export default metadata;

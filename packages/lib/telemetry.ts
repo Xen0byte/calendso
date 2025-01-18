@@ -1,5 +1,5 @@
-import { NextApiRequest, NextApiResponse } from "next";
-import { CollectOpts, EventHandler } from "next-collect";
+import type { NextApiRequest, NextApiResponse } from "next";
+import type { CollectOpts, EventHandler } from "next-collect";
 import { useCollector } from "next-collect/client";
 // Importing types so we're not directly importing next/server
 import type { NextRequest, NextResponse } from "next/server";
@@ -12,12 +12,17 @@ export const telemetryEventTypes = {
   bookingConfirmed: "booking_confirmed",
   bookingCancelled: "booking_cancelled",
   importSubmitted: "import_submitted",
-  googleLogin: "google_login",
   login: "login",
-  samlLogin: "saml_login",
-  samlConfig: "saml_config",
   embedView: "embed_view",
   embedBookingConfirmed: "embed_booking_confirmed",
+  onboardingFinished: "onboarding_finished",
+  onboardingStarted: "onboarding_started",
+  signup: "signup",
+  team_checkout_session_created: "team_checkout_session_created",
+  team_created: "team_created",
+  slugReplacementAction: "slug_replacement_action",
+  org_created: "org_created",
+  license_key_created: "license_key_created",
 };
 
 export function collectPageParameters(
@@ -29,7 +34,7 @@ export function collectPageParameters(
   return {
     page_url: route,
     doc_encoding: document.characterSet,
-    url: document.location.protocol + "//" + host + (docPath ?? ""),
+    url: `${document.location.protocol}//${host}${docPath ?? ""}`,
     ...extraData,
   };
 }
@@ -83,14 +88,14 @@ export const nextCollectBasicSettings: CollectOpts = {
 export const extendEventData = (
   req: NextRequest | NextApiRequest,
   res: NextResponse | NextApiResponse,
-  original: any
+  original: { page_url: string; isTeamBooking: boolean }
 ) => {
   const onVercel =
     typeof req.headers?.get === "function"
       ? !!req.headers.get("x-vercel-id")
-      : !!(req.headers as any)?.["x-vercel-id"];
+      : !!(req.headers as { [key: string]: string })?.["x-vercel-id"];
   const pageUrl = original?.page_url || req.url || undefined;
-  const cookies = req.cookies as { [key: string]: any };
+  const cookies = req.cookies as { [key: string]: string };
   return {
     title: "",
     ipAddress: "",

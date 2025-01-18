@@ -1,108 +1,39 @@
-import fs from "fs";
-import matter from "gray-matter";
-import { GetStaticPaths, GetStaticPropsContext } from "next";
-import { MDXRemote } from "next-mdx-remote";
-import { serialize } from "next-mdx-remote/serialize";
-import Image from "next/image";
-import Link from "next/link";
-import path from "path";
+import { Prisma } from "@prisma/client";
+import type { GetStaticPaths } from "next";
 
-import { getAppWithMetadata } from "@calcom/app-store/_appRegistry";
-import prisma from "@calcom/prisma";
+import { AppRepository } from "@calcom/lib/server/repository/app";
 
-import { inferSSRProps } from "@lib/types/inferSSRProps";
+import { getStaticProps } from "@lib/apps/[slug]/getStaticProps";
 
-import App from "@components/apps/App";
+import PageWrapper from "@components/PageWrapper";
 
-const components = {
-  a: ({ href = "", ...otherProps }: JSX.IntrinsicElements["a"]) => (
-    <Link href={href}>
-      <a {...otherProps} />
-    </Link>
-  ),
-  img: ({ src = "", alt = "", placeholder, ...rest }: JSX.IntrinsicElements["img"]) => (
-    <Image src={src} alt={alt} {...rest} />
-  ),
-  // @TODO: In v2 the slider isn't shown anymore. However, to ensure the v1 pages keep
-  // working, this component is still rendered in the MDX content. To skip them in the v2
-  // content we have to render null here. In v2 the gallery is shown by directly
-  // using the `items` property from the MDX's meta data.
-  Slider: () => <></>,
-};
+import type { PageProps } from "~/apps/[slug]/slug-view";
+import SingleAppPage from "~/apps/[slug]/slug-view";
 
-function SingleAppPage({ data, source }: inferSSRProps<typeof getStaticProps>) {
-  return (
-    <App
-      name={data.name}
-      description={data.description}
-      isGlobal={data.isGlobal}
-      slug={data.slug}
-      variant={data.variant}
-      type={data.type}
-      logo={data.logo}
-      categories={data.categories ?? [data.category]}
-      author={data.publisher}
-      feeType={data.feeType || "usage-based"}
-      price={data.price || 0}
-      commission={data.commission || 0}
-      docs={data.docsUrl}
-      website={data.url}
-      email={data.email}
-      licenseRequired={data.licenseRequired}
-      isProOnly={data.isProOnly}
-      images={source?.scope?.items as string[] | undefined}
-      //   tos="https://zoom.us/terms"
-      //   privacy="https://zoom.us/privacy"
-      body={<MDXRemote {...source} components={components} />}
-    />
-  );
-}
+const Page = (props: PageProps) => <SingleAppPage {...props} />;
 
 export const getStaticPaths: GetStaticPaths<{ slug: string }> = async () => {
-  const appStore = await prisma.app.findMany({ select: { slug: true } });
-  const paths = appStore.map(({ slug }) => ({ params: { slug } }));
+  let paths: { params: { slug: string } }[] = [];
+
+  try {
+    const appStore = await AppRepository.findAppStore();
+    paths = appStore.map(({ slug }) => ({ params: { slug } }));
+  } catch (e: unknown) {
+    if (e instanceof Prisma.PrismaClientInitializationError) {
+      // Database is not available at build time, but that's ok – we fall back to resolving paths on demand
+    } else {
+      throw e;
+    }
+  }
 
   return {
     paths,
-    fallback: false,
+    fallback: "blocking",
   };
 };
 
-export const getStaticProps = async (ctx: GetStaticPropsContext) => {
-  if (typeof ctx.params?.slug !== "string") return { notFound: true };
+export { getStaticProps };
 
-  const app = await prisma.app.findUnique({
-    where: { slug: ctx.params.slug },
-  });
+Page.PageWrapper = PageWrapper;
 
-  if (!app) return { notFound: true };
-
-  const singleApp = await getAppWithMetadata(app);
-
-  if (!singleApp) return { notFound: true };
-
-  const appDirname = app.dirName;
-  const README_PATH = path.join(process.cwd(), "..", "..", `packages/app-store/${appDirname}/README.mdx`);
-  const postFilePath = path.join(README_PATH);
-  let source = "";
-
-  try {
-    /* If the app doesn't have a README we fallback to the package description */
-    source = fs.readFileSync(postFilePath).toString();
-  } catch (error) {
-    console.log(`No README.mdx provided for: ${appDirname}`);
-    source = singleApp.description;
-  }
-
-  const { content, data } = matter(source);
-  const mdxSource = await serialize(content, { scope: data });
-
-  return {
-    props: {
-      source: mdxSource,
-      data: singleApp,
-    },
-  };
-};
-
-export default SingleAppPage;
+export default Page;

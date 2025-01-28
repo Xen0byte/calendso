@@ -3,14 +3,26 @@
   "name": "Plausible",
   "slug": "plausible",
   "type": "plausible_analytics",
-  "imageSrc": "/api/app-store/plausible/icon.svg",
-  "logo": "/api/app-store/plausible/icon.svg",
-  "url": "https://cal.com/apps/plausible",
+  "logo": "icon.svg",
+  "url": "https://cal.com/",
   "variant": "analytics",
   "categories": ["analytics"],
   "publisher": "Cal.com, Inc.",
   "email": "help@cal.com",
   "extendsFeature": "EventType",
+  "appData": {
+    "tag": {
+      "scripts": [
+        {
+          "src": "{PLAUSIBLE_URL}",
+          "attrs": {
+            "data-domain": "{TRACKING_ID}"
+          }
+        }
+      ]
+    }
+  },
   "description": "Simple, privacy-friendly Google Analytics alternative.",
-  "__createdUsingCli": true
+  "__createdUsingCli": true,
+  "isOAuth": false
 }

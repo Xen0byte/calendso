@@ -1,6 +1,6 @@
 import client from "@sendgrid/client";
-import { ClientRequest } from "@sendgrid/client/src/request";
-import { ClientResponse } from "@sendgrid/client/src/response";
+import type { ClientRequest } from "@sendgrid/client/src/request";
+import type { ClientResponse } from "@sendgrid/client/src/response";
 
 import logger from "@calcom/lib/logger";
 
@@ -52,7 +52,7 @@ export default class Sendgrid {
   private log: typeof logger;
 
   constructor(providedApiKey = "") {
-    this.log = logger.getChildLogger({ prefix: [`[[lib] sendgrid`] });
+    this.log = logger.getSubLogger({ prefix: [`[[lib] sendgrid`] });
     if (!providedApiKey && !environmentApiKey) throw Error("Sendgrid Api Key not present");
     client.setApiKey(providedApiKey || environmentApiKey);
   }

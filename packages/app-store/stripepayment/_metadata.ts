@@ -12,11 +12,8 @@ export const metadata = {
   ),
   slug: "stripe",
   category: "payment",
-  logo: "/api/app-store/stripepayment/icon.svg",
-  rating: 4.6,
-  trending: true,
-  reviews: 69,
-  imageSrc: "/api/app-store/stripepayment/icon.svg",
+  categories: ["payment"],
+  logo: "icon.svg",
   publisher: "Cal.com",
   title: "Stripe",
   type: "stripe_payment",
@@ -24,9 +21,9 @@ export const metadata = {
   docsUrl: "https://stripe.com/docs",
   variant: "payment",
   extendsFeature: "EventType",
-  verified: true,
   email: "help@cal.com",
   dirName: "stripepayment",
+  isOAuth: true,
 } as AppMeta;
 
 export default metadata;

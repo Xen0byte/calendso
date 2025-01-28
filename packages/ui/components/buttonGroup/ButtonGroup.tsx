@@ -20,8 +20,8 @@ export function ButtonGroup({ children, combined = false, containerProps }: Prop
       className={classNames(
         "flex",
         !combined
-          ? "space-x-2"
-          : "[&_button]:rounded-none [&_button]:border-l-0 [&>*:first-child]:rounded-l-md [&>*:first-child]:border-l [&_a]:rounded-none  [&_a]:border-l-0 [&>*:last-child]:rounded-r-md",
+          ? "space-x-2 rtl:space-x-reverse"
+          : "ltr:[&>*:first-child]:ml-0 ltr:[&>*:first-child]:rounded-l-md ltr:[&>*:first-child]:border-l rtl:[&>*:first-child]:rounded-r-md rtl:[&>*:first-child]:border-r ltr:[&>*:last-child]:rounded-r-md rtl:[&>*:last-child]:rounded-l-md [&>a]:-ml-[1px] hover:[&>a]:z-[1] [&>button]:-ml-[1px] hover:[&>button]:z-[1] [&_a]:rounded-none [&_button]:rounded-none",
         containerProps?.className
       )}>
       {children}

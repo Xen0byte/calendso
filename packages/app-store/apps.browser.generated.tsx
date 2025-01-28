@@ -5,39 +5,63 @@
 import dynamic from "next/dynamic";
 
 export const InstallAppButtonMap = {
-  applecalendar: dynamic(() => import("./applecalendar/components/InstallAppButton")),
-  around: dynamic(() => import("./around/components/InstallAppButton")),
-  caldavcalendar: dynamic(() => import("./caldavcalendar/components/InstallAppButton")),
-  closecom: dynamic(() => import("./closecom/components/InstallAppButton")),
   exchange2013calendar: dynamic(() => import("./exchange2013calendar/components/InstallAppButton")),
   exchange2016calendar: dynamic(() => import("./exchange2016calendar/components/InstallAppButton")),
-  exchangecalendar: dynamic(() => import("./exchangecalendar/components/InstallAppButton")),
-  googlecalendar: dynamic(() => import("./googlecalendar/components/InstallAppButton")),
-  hubspot: dynamic(() => import("./hubspot/components/InstallAppButton")),
-  huddle01video: dynamic(() => import("./huddle01video/components/InstallAppButton")),
-  jitsivideo: dynamic(() => import("./jitsivideo/components/InstallAppButton")),
-  larkcalendar: dynamic(() => import("./larkcalendar/components/InstallAppButton")),
-  office365calendar: dynamic(() => import("./office365calendar/components/InstallAppButton")),
   office365video: dynamic(() => import("./office365video/components/InstallAppButton")),
-  plausible: dynamic(() => import("./plausible/components/InstallAppButton")),
-  riverside: dynamic(() => import("./riverside/components/InstallAppButton")),
-  tandemvideo: dynamic(() => import("./tandemvideo/components/InstallAppButton")),
   vital: dynamic(() => import("./vital/components/InstallAppButton")),
-  whereby: dynamic(() => import("./whereby/components/InstallAppButton")),
-  wipemycalother: dynamic(() => import("./wipemycalother/components/InstallAppButton")),
-  zapier: dynamic(() => import("./zapier/components/InstallAppButton")),
-  zoomvideo: dynamic(() => import("./zoomvideo/components/InstallAppButton")),
 };
 export const AppSettingsComponentsMap = {
-  weather_in_your_calendar: dynamic(() => import("./weather_in_your_calendar/components/AppSettings")),
-  zapier: dynamic(() => import("./zapier/components/AppSettings")),
+  "general-app-settings": dynamic(() =>
+    import("./templates/general-app-settings/components/AppSettingsInterface")
+  ),
+  weather_in_your_calendar: dynamic(() =>
+    import("./weather_in_your_calendar/components/AppSettingsInterface")
+  ),
+  zapier: dynamic(() => import("./zapier/components/AppSettingsInterface")),
 };
 export const EventTypeAddonMap = {
-  fathom: dynamic(() => import("./fathom/extensions/EventTypeAppCard")),
-  ga4: dynamic(() => import("./ga4/extensions/EventTypeAppCard")),
-  giphy: dynamic(() => import("./giphy/extensions/EventTypeAppCard")),
-  plausible: dynamic(() => import("./plausible/extensions/EventTypeAppCard")),
-  qr_code: dynamic(() => import("./qr_code/extensions/EventTypeAppCard")),
-  rainbow: dynamic(() => import("./rainbow/extensions/EventTypeAppCard")),
-  stripepayment: dynamic(() => import("./stripepayment/extensions/EventTypeAppCard")),
+  alby: dynamic(() => import("./alby/components/EventTypeAppCardInterface")),
+  basecamp3: dynamic(() => import("./basecamp3/components/EventTypeAppCardInterface")),
+  closecom: dynamic(() => import("./closecom/components/EventTypeAppCardInterface")),
+  fathom: dynamic(() => import("./fathom/components/EventTypeAppCardInterface")),
+  ga4: dynamic(() => import("./ga4/components/EventTypeAppCardInterface")),
+  giphy: dynamic(() => import("./giphy/components/EventTypeAppCardInterface")),
+  gtm: dynamic(() => import("./gtm/components/EventTypeAppCardInterface")),
+  hitpay: dynamic(() => import("./hitpay/components/EventTypeAppCardInterface")),
+  hubspot: dynamic(() => import("./hubspot/components/EventTypeAppCardInterface")),
+  insihts: dynamic(() => import("./insihts/components/EventTypeAppCardInterface")),
+  matomo: dynamic(() => import("./matomo/components/EventTypeAppCardInterface")),
+  metapixel: dynamic(() => import("./metapixel/components/EventTypeAppCardInterface")),
+  "mock-payment-app": dynamic(() => import("./mock-payment-app/components/EventTypeAppCardInterface")),
+  paypal: dynamic(() => import("./paypal/components/EventTypeAppCardInterface")),
+  "pipedrive-crm": dynamic(() => import("./pipedrive-crm/components/EventTypeAppCardInterface")),
+  plausible: dynamic(() => import("./plausible/components/EventTypeAppCardInterface")),
+  posthog: dynamic(() => import("./posthog/components/EventTypeAppCardInterface")),
+  qr_code: dynamic(() => import("./qr_code/components/EventTypeAppCardInterface")),
+  salesforce: dynamic(() => import("./salesforce/components/EventTypeAppCardInterface")),
+  stripepayment: dynamic(() => import("./stripepayment/components/EventTypeAppCardInterface")),
+  "booking-pages-tag": dynamic(() =>
+    import("./templates/booking-pages-tag/components/EventTypeAppCardInterface")
+  ),
+  "event-type-app-card": dynamic(() =>
+    import("./templates/event-type-app-card/components/EventTypeAppCardInterface")
+  ),
+  twipla: dynamic(() => import("./twipla/components/EventTypeAppCardInterface")),
+  umami: dynamic(() => import("./umami/components/EventTypeAppCardInterface")),
+  "zoho-bigin": dynamic(() => import("./zoho-bigin/components/EventTypeAppCardInterface")),
+  zohocrm: dynamic(() => import("./zohocrm/components/EventTypeAppCardInterface")),
+};
+export const EventTypeSettingsMap = {
+  alby: dynamic(() => import("./alby/components/EventTypeAppSettingsInterface")),
+  basecamp3: dynamic(() => import("./basecamp3/components/EventTypeAppSettingsInterface")),
+  fathom: dynamic(() => import("./fathom/components/EventTypeAppSettingsInterface")),
+  ga4: dynamic(() => import("./ga4/components/EventTypeAppSettingsInterface")),
+  giphy: dynamic(() => import("./giphy/components/EventTypeAppSettingsInterface")),
+  gtm: dynamic(() => import("./gtm/components/EventTypeAppSettingsInterface")),
+  hitpay: dynamic(() => import("./hitpay/components/EventTypeAppSettingsInterface")),
+  metapixel: dynamic(() => import("./metapixel/components/EventTypeAppSettingsInterface")),
+  paypal: dynamic(() => import("./paypal/components/EventTypeAppSettingsInterface")),
+  plausible: dynamic(() => import("./plausible/components/EventTypeAppSettingsInterface")),
+  qr_code: dynamic(() => import("./qr_code/components/EventTypeAppSettingsInterface")),
+  stripepayment: dynamic(() => import("./stripepayment/components/EventTypeAppSettingsInterface")),
 };

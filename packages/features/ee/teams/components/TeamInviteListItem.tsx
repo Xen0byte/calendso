@@ -1,17 +1,17 @@
-import { MembershipRole } from "@prisma/client";
-
 import classNames from "@calcom/lib/classNames";
-import { getPlaceholderAvatar } from "@calcom/lib/getPlaceholderAvatar";
+import { getPlaceholderAvatar } from "@calcom/lib/defaultAvatarImage";
 import { useLocale } from "@calcom/lib/hooks/useLocale";
+import type { MembershipRole } from "@calcom/prisma/enums";
 import { trpc } from "@calcom/trpc/react";
 import {
   Avatar,
   Button,
   Dropdown,
+  DropdownItem,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  Icon,
+  showToast,
 } from "@calcom/ui";
 
 interface Props {
@@ -19,28 +19,31 @@ interface Props {
     id?: number;
     name?: string | null;
     slug?: string | null;
-    logo?: string | null;
     bio?: string | null;
+    logoUrl?: string | null;
     hideBranding?: boolean | undefined;
     role: MembershipRole;
     accepted: boolean;
   };
   key: number;
   onActionSelect: (text: string) => void;
-  isLoading?: boolean;
+  isPending?: boolean;
   hideDropdown: boolean;
   setHideDropdown: (value: boolean) => void;
 }
 
 export default function TeamInviteListItem(props: Props) {
   const { t } = useLocale();
-  const utils = trpc.useContext();
+  const utils = trpc.useUtils();
   const team = props.team;
 
   const acceptOrLeaveMutation = trpc.viewer.teams.acceptOrLeave.useMutation({
     onSuccess: async () => {
+      showToast(t("success"), "success");
       await utils.viewer.teams.get.invalidate();
+      await utils.viewer.teams.hasTeamPlan.invalidate();
       await utils.viewer.teams.list.invalidate();
+      await utils.viewer.organizations.listMembers.invalidate();
     },
   });
 
@@ -62,13 +65,13 @@ export default function TeamInviteListItem(props: Props) {
     <div className="flex">
       <Avatar
         size="mdLg"
-        imageSrc={getPlaceholderAvatar(team?.logo, team?.name as string)}
+        imageSrc={getPlaceholderAvatar(team.logoUrl, team.name)}
         alt="Team Logo"
         className=""
       />
-      <div className="ml-3 inline-block">
-        <span className="text-sm font-semibold text-black">{team.name}</span>
-        <span className="block text-sm leading-5 text-gray-700">
+      <div className="ms-3 inline-block">
+        <span className="text-emphasis text-sm font-semibold">{team.name}</span>
+        <span className="text-default block text-sm leading-5">
           {t("invited_by_team", { teamName: team.name, role: t(team.role.toLocaleLowerCase()) })}
         </span>
       </div>
@@ -76,7 +79,7 @@ export default function TeamInviteListItem(props: Props) {
   );
 
   return (
-    <li className="divide-y rounded-md border border-gray-400 bg-gray-100 px-5 py-4">
+    <li className="bg-subtle border-emphasis divide-subtle divide-y rounded-md border px-5 py-4">
       <div
         className={classNames(
           "flex items-center  justify-between",
@@ -88,44 +91,36 @@ export default function TeamInviteListItem(props: Props) {
             <div className="hidden sm:flex">
               <Button
                 type="button"
-                className="mr-3 border-gray-700"
-                size="icon"
+                className="border-empthasis mr-3"
+                variant="icon"
                 color="secondary"
                 onClick={declineInvite}
-                StartIcon={Icon.FiSlash}
+                StartIcon="ban"
               />
               <Button
                 type="button"
-                className="border-gray-700"
-                size="icon"
+                className="border-empthasis"
+                variant="icon"
                 color="secondary"
                 onClick={acceptInvite}
-                StartIcon={Icon.FiCheck}
+                StartIcon="check"
               />
             </div>
             <div className="block sm:hidden">
               <Dropdown>
                 <DropdownMenuTrigger asChild>
-                  <Button type="button" color="minimal" size="icon" StartIcon={Icon.FiMoreHorizontal} />
+                  <Button type="button" color="minimal" variant="icon" StartIcon="ellipsis" />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent>
                   <DropdownMenuItem>
-                    <Button
-                      color="destructive"
-                      className="w-full rounded-none font-medium"
-                      StartIcon={Icon.FiCheck}
-                      onClick={acceptInvite}>
+                    <DropdownItem type="button" StartIcon="check" onClick={acceptInvite}>
                       {t("accept")}
-                    </Button>
+                    </DropdownItem>
                   </DropdownMenuItem>
                   <DropdownMenuItem>
-                    <Button
-                      color="destructive"
-                      className="w-full rounded-none font-medium"
-                      StartIcon={Icon.FiX}
-                      onClick={declineInvite}>
+                    <DropdownItem color="destructive" type="button" StartIcon="x" onClick={declineInvite}>
                       {t("reject")}
-                    </Button>
+                    </DropdownItem>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </Dropdown>

@@ -1,56 +1,67 @@
-import { WorkflowActions, WorkflowTemplates } from "@prisma/client";
-import { useRouter } from "next/router";
-import { Dispatch, SetStateAction, useMemo, useState } from "react";
-import { Controller, UseFormReturn } from "react-hook-form";
+import { useRouter, useSearchParams } from "next/navigation";
+import type { Dispatch, SetStateAction } from "react";
+import { useState, useEffect } from "react";
+import type { UseFormReturn } from "react-hook-form";
+import { Controller } from "react-hook-form";
 
-import { SENDER_ID } from "@calcom/lib/constants";
+import { SENDER_ID, SENDER_NAME } from "@calcom/lib/constants";
 import { useLocale } from "@calcom/lib/hooks/useLocale";
-import { trpc } from "@calcom/trpc/react";
-import useMeQuery from "@calcom/trpc/react/hooks/useMeQuery";
-import { Icon } from "@calcom/ui";
-import { Button, Label, TextField } from "@calcom/ui";
-import { MultiSelectCheckboxes } from "@calcom/ui";
+import type { WorkflowActions } from "@calcom/prisma/enums";
+import { WorkflowTemplates } from "@calcom/prisma/enums";
+import type { RouterOutputs } from "@calcom/trpc/react";
 import type { MultiSelectCheckboxesOptionType as Option } from "@calcom/ui";
+import { Button, Icon, Label, MultiSelectCheckboxes, TextField, CheckboxField, InfoBadge } from "@calcom/ui";
 
+import { isSMSAction } from "../lib/actionHelperFunctions";
 import type { FormValues } from "../pages/workflow";
 import { AddActionDialog } from "./AddActionDialog";
 import { DeleteDialog } from "./DeleteDialog";
 import WorkflowStepContainer from "./WorkflowStepContainer";
 
+type User = RouterOutputs["viewer"]["me"];
+
 interface Props {
   form: UseFormReturn<FormValues>;
   workflowId: number;
-  selectedEventTypes: Option[];
-  setSelectedEventTypes: Dispatch<SetStateAction<Option[]>>;
+  selectedOptions: Option[];
+  setSelectedOptions: Dispatch<SetStateAction<Option[]>>;
+  teamId?: number;
+  user: User;
+  readOnly: boolean;
+  isOrg: boolean;
+  allOptions: Option[];
 }
 
 export default function WorkflowDetailsPage(props: Props) {
-  const { form, workflowId, selectedEventTypes, setSelectedEventTypes } = props;
+  const { form, workflowId, selectedOptions, setSelectedOptions, teamId, isOrg, allOptions } = props;
   const { t } = useLocale();
   const router = useRouter();
 
   const [isAddActionDialogOpen, setIsAddActionDialogOpen] = useState(false);
+
   const [reload, setReload] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
-  const { data, isLoading } = trpc.viewer.eventTypes.getByViewer.useQuery();
+  const searchParams = useSearchParams();
+  const eventTypeId = searchParams?.get("eventTypeId");
 
-  const eventTypeOptions = useMemo(
-    () =>
-      data?.eventTypeGroups.reduce(
-        (options, group) => [
-          ...options,
-          ...group.eventTypes.map((eventType) => ({
-            value: String(eventType.id),
-            label: eventType.title,
-          })),
-        ],
-        [] as Option[]
-      ) || [],
-    [data]
-  );
+  useEffect(() => {
+    const matchingOption = allOptions.find((option) => option.value === eventTypeId);
+    if (matchingOption && !selectedOptions.find((option) => option.value === eventTypeId)) {
+      const newOptions = [...selectedOptions, matchingOption];
+      setSelectedOptions(newOptions);
+      form.setValue("activeOn", newOptions);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eventTypeId]);
 
-  const addAction = (action: WorkflowActions, sendTo?: string, numberRequired?: boolean, sender?: string) => {
+  const addAction = (
+    action: WorkflowActions,
+    sendTo?: string,
+    numberRequired?: boolean,
+    sender?: string,
+    senderName?: string
+  ) => {
     const steps = form.getValues("steps");
     const id =
       steps?.length > 0
@@ -72,9 +83,12 @@ export default function WorkflowDetailsPage(props: Props) {
       workflowId: workflowId,
       reminderBody: null,
       emailSubject: null,
-      template: WorkflowTemplates.CUSTOM,
+      template: WorkflowTemplates.REMINDER,
       numberRequired: numberRequired || false,
-      sender: sender || SENDER_ID,
+      sender: isSMSAction(action) ? sender || SENDER_ID : SENDER_ID,
+      senderName: !isSMSAction(action) ? senderName || SENDER_NAME : SENDER_NAME,
+      numberVerificationPending: false,
+      includeCalendarEvent: false,
     };
     steps?.push(step);
     form.setValue("steps", steps);
@@ -82,47 +96,89 @@ export default function WorkflowDetailsPage(props: Props) {
 
   return (
     <>
-      <div className="my-8 sm:my-0 md:flex">
+      <div className="z-1 my-8 sm:my-0 md:flex">
         <div className="pl-2 pr-3 md:sticky md:top-6 md:h-0 md:pl-0">
           <div className="mb-5">
-            <TextField label={`${t("workflow_name")}:`} type="text" {...form.register("name")} />
+            <TextField
+              data-testid="workflow-name"
+              disabled={props.readOnly}
+              label={`${t("workflow_name")}:`}
+              type="text"
+              {...form.register("name")}
+            />
           </div>
-          <Label>{t("which_event_type_apply")}</Label>
+          {isOrg ? (
+            <div className="flex">
+              <Label>{t("which_team_apply")}</Label>
+              <div className="-mt-0.5">
+                <InfoBadge content={t("team_select_info")} />
+              </div>
+            </div>
+          ) : (
+            <Label>{t("which_event_type_apply")}</Label>
+          )}
           <Controller
             name="activeOn"
             control={form.control}
             render={() => {
               return (
                 <MultiSelectCheckboxes
-                  options={eventTypeOptions}
-                  isLoading={isLoading}
+                  options={allOptions}
+                  isDisabled={props.readOnly || form.getValues("selectAll")}
                   className="w-full md:w-64"
-                  setSelected={setSelectedEventTypes}
-                  selected={selectedEventTypes}
+                  setSelected={setSelectedOptions}
+                  selected={form.getValues("selectAll") ? allOptions : selectedOptions}
                   setValue={(s: Option[]) => {
                     form.setValue("activeOn", s);
                   }}
+                  countText={isOrg ? "count_team" : "nr_event_type"}
                 />
               );
             }}
           />
-          <div className="my-7 border-transparent md:border-t md:border-gray-200" />
-          <Button
-            type="button"
-            StartIcon={Icon.FiTrash2}
-            color="destructive"
-            className="border"
-            onClick={() => setDeleteDialogOpen(true)}>
-            {t("delete_workflow")}
-          </Button>
-          <div className="my-7 border-t border-gray-200 md:border-none" />
+          <div className="mt-3">
+            <Controller
+              name="selectAll"
+              render={({ field: { value, onChange } }) => (
+                <CheckboxField
+                  description={isOrg ? t("apply_to_all_teams") : t("apply_to_all_event_types")}
+                  disabled={props.readOnly}
+                  onChange={(e) => {
+                    onChange(e);
+                    if (e.target.value) {
+                      setSelectedOptions(allOptions);
+                      form.setValue("activeOn", allOptions);
+                    }
+                  }}
+                  checked={value}
+                />
+              )}
+            />
+          </div>
+          <div className="md:border-subtle my-7 border-transparent md:border-t" />
+          {!props.readOnly && (
+            <Button
+              type="button"
+              StartIcon="trash-2"
+              color="destructive"
+              className="border"
+              onClick={() => setDeleteDialogOpen(true)}>
+              {t("delete_workflow")}
+            </Button>
+          )}
+          <div className="border-subtle my-7 border-t md:border-none" />
         </div>
 
         {/* Workflow Trigger Event & Steps */}
-        <div className="w-full rounded-md border border-gray-200 bg-gray-50 p-3 py-5 md:ml-3 md:p-8">
+        <div className="bg-muted border-subtle w-full rounded-md border p-3 py-5 md:ml-3 md:p-8">
           {form.getValues("trigger") && (
             <div>
-              <WorkflowStepContainer form={form} />
+              <WorkflowStepContainer
+                form={form}
+                user={props.user}
+                teamId={teamId}
+                readOnly={props.readOnly}
+              />
             </div>
           )}
           {form.getValues("steps") && (
@@ -132,26 +188,33 @@ export default function WorkflowDetailsPage(props: Props) {
                   <WorkflowStepContainer
                     key={step.id}
                     form={form}
+                    user={props.user}
                     step={step}
                     reload={reload}
                     setReload={setReload}
+                    teamId={teamId}
+                    readOnly={props.readOnly}
                   />
                 );
               })}
             </>
           )}
-          <div className="my-3 flex justify-center">
-            <Icon.FiArrowDown className="stroke-[1.5px] text-3xl text-gray-500" />
-          </div>
-          <div className="flex justify-center">
-            <Button
-              type="button"
-              onClick={() => setIsAddActionDialogOpen(true)}
-              color="secondary"
-              className="bg-white">
-              {t("add_action")}
-            </Button>
-          </div>
+          {!props.readOnly && (
+            <>
+              <div className="my-3 flex justify-center">
+                <Icon name="arrow-down" className="text-subtle stroke-[1.5px] text-3xl" />
+              </div>
+              <div className="flex justify-center">
+                <Button
+                  type="button"
+                  onClick={() => setIsAddActionDialogOpen(true)}
+                  color="secondary"
+                  className="bg-default">
+                  {t("add_action")}
+                </Button>
+              </div>
+            </>
+          )}
         </div>
       </div>
       <AddActionDialog
@@ -163,7 +226,7 @@ export default function WorkflowDetailsPage(props: Props) {
         isOpenDialog={deleteDialogOpen}
         setIsOpenDialog={setDeleteDialogOpen}
         workflowId={workflowId}
-        additionalFunction={async () => await router.push("/workflows")}
+        additionalFunction={async () => router.push("/workflows")}
       />
     </>
   );

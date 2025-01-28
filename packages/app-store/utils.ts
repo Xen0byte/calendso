@@ -1,21 +1,29 @@
-import { Prisma } from "@prisma/client";
-import { TFunction } from "next-i18next";
-import { z } from "zod";
-
-import { defaultLocations, EventLocationType } from "@calcom/app-store/locations";
-import { EventTypeModel } from "@calcom/prisma/zod";
-import { EventTypeMetaDataSchema } from "@calcom/prisma/zod-utils";
-import type { App, AppMeta } from "@calcom/types/App";
+import type { AppCategories } from "@prisma/client";
 
 // If you import this file on any app it should produce circular dependency
 // import appStore from "./index";
-import { appStoreMetadata } from "./apps.metadata.generated";
+import { appStoreMetadata } from "@calcom/app-store/appStoreMetaData";
+import type { EventLocationType } from "@calcom/app-store/locations";
+import logger from "@calcom/lib/logger";
+import { getPiiFreeCredential } from "@calcom/lib/piiFreeData";
+import { safeStringify } from "@calcom/lib/safeStringify";
+import type { App, AppMeta } from "@calcom/types/App";
+import type { CredentialPayload } from "@calcom/types/Credential";
 
-export type EventTypeApps = NonNullable<NonNullable<z.infer<typeof EventTypeMetaDataSchema>>["apps"]>;
-export type EventTypeAppsList = keyof EventTypeApps;
+export * from "./_utils/getEventTypeAppData";
+
+export type LocationOption = {
+  label: string;
+  value: EventLocationType["type"];
+  icon?: string;
+  disabled?: boolean;
+};
 
 const ALL_APPS_MAP = Object.keys(appStoreMetadata).reduce((store, key) => {
-  store[key] = appStoreMetadata[key as keyof typeof appStoreMetadata];
+  const metadata = appStoreMetadata[key as keyof typeof appStoreMetadata] as AppMeta;
+
+  store[key] = metadata;
+
   // eslint-disable-next-line @typescript-eslint/ban-ts-comment
   //@ts-ignore
   delete store[key]["/*"];
@@ -25,133 +33,51 @@ const ALL_APPS_MAP = Object.keys(appStoreMetadata).reduce((store, key) => {
   return store;
 }, {} as Record<string, AppMeta>);
 
-const credentialData = Prisma.validator<Prisma.CredentialArgs>()({
-  select: { id: true, type: true, key: true, userId: true, appId: true, invalid: true },
-});
-
-export type CredentialData = Prisma.CredentialGetPayload<typeof credentialData>;
-
-export enum InstalledAppVariants {
-  "conferencing" = "conferencing",
-  "calendar" = "calendar",
-  "payment" = "payment",
-  "analytics" = "analytics",
-  "automation" = "automation",
-  "other" = "other",
-}
-
-export const ALL_APPS = Object.values(ALL_APPS_MAP);
-
-type OptionTypeBase = {
-  label: string;
-  value: EventLocationType["type"];
-  disabled?: boolean;
+export type CredentialDataWithTeamName = CredentialPayload & {
+  team?: {
+    name: string;
+  } | null;
 };
 
-function translateLocations(locations: OptionTypeBase[], t: TFunction) {
-  return locations.map((l) => ({
-    ...l,
-    label: t(l.label),
-  }));
-}
-
-export function getLocationOptions(integrations: ReturnType<typeof getApps>, t: TFunction) {
-  const locations: OptionTypeBase[] = [];
-  defaultLocations.forEach((l) => {
-    locations.push({
-      label: l.label,
-      value: l.type,
-    });
-  });
-  integrations.forEach((app) => {
-    if (app.locationOption) {
-      locations.push(app.locationOption);
-    }
-  });
-
-  return translateLocations(locations, t);
-}
-
-export function getLocationGroupedOptions(integrations: ReturnType<typeof getApps>, t: TFunction) {
-  const apps: Record<string, { label: string; value: string; disabled?: boolean; icon?: string }[]> = {};
-  integrations.forEach((app) => {
-    if (app.locationOption) {
-      const category = app.category;
-      const option = { ...app.locationOption, icon: app.imageSrc };
-      if (apps[category]) {
-        apps[category] = [...apps[category], option];
-      } else {
-        apps[category] = [option];
-      }
-    }
-  });
-
-  defaultLocations.forEach((l) => {
-    const category = l.category;
-    if (apps[category]) {
-      apps[category] = [
-        ...apps[category],
-        {
-          label: l.label,
-          value: l.type,
-          icon: l.iconUrl,
-        },
-      ];
-    } else {
-      apps[category] = [
-        {
-          label: l.label,
-          value: l.type,
-          icon: l.iconUrl,
-        },
-      ];
-    }
-  });
-  const locations = [];
-
-  // Translating labels and pushing into array
-  for (const category in apps) {
-    const tmp = { label: category, options: apps[category] };
-    if (tmp.label === "in person") {
-      tmp.options.map((l) => ({ ...l, label: t(l.value) }));
-    } else {
-      tmp.options.map((l) => ({
-        ...l,
-        label: t(l.label.toLowerCase().split(" ").join("_")),
-      }));
-    }
-
-    tmp.label = t(tmp.label);
-
-    locations.push(tmp);
-  }
-  return locations;
-}
+export const ALL_APPS = Object.values(ALL_APPS_MAP);
 
 /**
  * This should get all available apps to the user based on his saved
  * credentials, this should also get globally available apps.
  */
-function getApps(userCredentials: CredentialData[]) {
-  const apps = ALL_APPS.map((appMeta) => {
-    const credentials = userCredentials.filter((credential) => credential.type === appMeta.type);
-    let locationOption: OptionTypeBase | null = null;
+function getApps(credentials: CredentialDataWithTeamName[], filterOnCredentials?: boolean) {
+  const apps = ALL_APPS.reduce((reducedArray, appMeta) => {
+    const appCredentials = credentials.filter((credential) => credential.appId === appMeta.slug);
+
+    if (filterOnCredentials && !appCredentials.length && !appMeta.isGlobal) return reducedArray;
+
+    let locationOption: LocationOption | null = null;
 
     /** If the app is a globally installed one, let's inject it's key */
     if (appMeta.isGlobal) {
-      credentials.push({
-        id: +new Date().getTime(),
+      const credential = {
+        id: 0,
         type: appMeta.type,
         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         key: appMeta.key!,
-        userId: +new Date().getTime(),
+        userId: 0,
+        user: { email: "" },
+        teamId: null,
         appId: appMeta.slug,
         invalid: false,
-      });
+        team: {
+          name: "Global",
+        },
+      };
+      logger.debug(
+        `${appMeta.type} is a global app, injecting credential`,
+        safeStringify(getPiiFreeCredential(credential))
+      );
+      appCredentials.push(credential);
     }
 
     /** Check if app has location option AND add it if user has credentials for it */
-    if (credentials.length > 0 && appMeta?.appData?.location) {
+    if (appCredentials.length > 0 && appMeta?.appData?.location) {
       locationOption = {
         value: appMeta.appData.location.type,
         label: appMeta.appData.location.label || "No label set",
@@ -159,18 +85,21 @@ function getApps(userCredentials: CredentialData[]) {
       };
     }
 
-    const credential: typeof credentials[number] | null = credentials[0] || null;
-    return {
+    const credential: (typeof appCredentials)[number] | null = appCredentials[0] || null;
+
+    reducedArray.push({
       ...appMeta,
       /**
        * @deprecated use `credentials`
        */
       credential,
-      credentials,
+      credentials: appCredentials,
       /** Option to display in `location` field while editing event types */
       locationOption,
-    };
-  });
+    });
+
+    return reducedArray;
+  }, [] as (App & { credential: CredentialDataWithTeamName; credentials: CredentialDataWithTeamName[]; locationOption: LocationOption | null })[]);
 
   return apps;
 }
@@ -199,44 +128,48 @@ export function getAppType(name: string): string {
   return "Unknown";
 }
 
-export const getEventTypeAppData = <T extends EventTypeAppsList>(
-  eventType: Pick<z.infer<typeof EventTypeModel>, "price" | "currency" | "metadata">,
-  appId: T,
-  forcedGet?: boolean
-): EventTypeApps[T] => {
-  const metadata = eventType.metadata;
-  const appMetadata = metadata?.apps && metadata.apps[appId];
-  if (appMetadata) {
-    const allowDataGet = forcedGet ? true : appMetadata.enabled;
-    return allowDataGet ? appMetadata : null;
+export function getAppFromSlug(slug: string | undefined): AppMeta | undefined {
+  return ALL_APPS.find((app) => app.slug === slug);
+}
+
+export function getAppFromLocationValue(type: string): AppMeta | undefined {
+  return ALL_APPS.find((app) => app?.appData?.location?.type === type);
+}
+
+/**
+ *
+ * @param appCategories - from app metadata
+ * @param concurrentMeetings - from app metadata
+ * @returns - true if app supports team install
+ */
+export function doesAppSupportTeamInstall({
+  appCategories,
+  concurrentMeetings = undefined,
+  isPaid,
+}: {
+  appCategories: string[];
+  concurrentMeetings: boolean | undefined;
+  isPaid: boolean;
+}) {
+  // Paid apps can't be installed on team level - That isn't supported
+  if (isPaid) {
+    return false;
   }
+  return !appCategories.some(
+    (category) =>
+      category === "calendar" ||
+      (defaultVideoAppCategories.includes(category as AppCategories) && !concurrentMeetings)
+  );
+}
 
-  // Backward compatibility for existing event types.
-  // TODO: After the new AppStore EventType App flow is stable, write a migration to migrate metadata to new format which will let us remove this compatibility code
-  // Migration isn't being done right now, to allow a revert if needed
-  const legacyAppsData = {
-    stripe: {
-      enabled: eventType.price > 0,
-      // Price default is 0 in DB. So, it would always be non nullish.
-      price: eventType.price,
-      // Currency default is "usd" in DB.So, it would also be available always
-      currency: eventType.currency,
-    },
-    rainbow: {
-      enabled: !!(eventType.metadata?.smartContractAddress && eventType.metadata?.blockchainId),
-      smartContractAddress: eventType.metadata?.smartContractAddress || "",
-      blockchainId: eventType.metadata?.blockchainId || 0,
-    },
-    giphy: {
-      enabled: !!eventType.metadata?.giphyThankYouPage,
-      thankYouPage: eventType.metadata?.giphyThankYouPage || "",
-    },
-  } as const;
-
-  // TODO: This assertion helps typescript hint that only one of the app's data can be returned
-  const legacyAppData = legacyAppsData[appId as Extract<T, keyof typeof legacyAppsData>];
-  const allowDataGet = forcedGet ? true : legacyAppData?.enabled;
-  return allowDataGet ? legacyAppData : null;
-};
+export function isConferencing(appCategories: string[]) {
+  return appCategories.some((category) => category === "conferencing" || category === "video");
+}
+export const defaultVideoAppCategories: AppCategories[] = [
+  "messaging",
+  "conferencing",
+  // Legacy name for conferencing
+  "video",
+];
 
 export default getApps;

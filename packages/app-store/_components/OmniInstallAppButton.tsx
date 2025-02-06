@@ -2,7 +2,7 @@ import { classNames } from "@calcom/lib";
 import useApp from "@calcom/lib/hooks/useApp";
 import { useLocale } from "@calcom/lib/hooks/useLocale";
 import { trpc } from "@calcom/trpc/react";
-import { Button, Icon, showToast } from "@calcom/ui";
+import { Button, showToast } from "@calcom/ui";
 
 import useAddAppMutation from "../_utils/useAddAppMutation";
 import { InstallAppButton } from "../components";
@@ -11,16 +11,30 @@ import { InstallAppButton } from "../components";
  * Use this component to allow installing an app from anywhere on the app.
  * Use of this component requires you to remove custom InstallAppButtonComponent so that it can manage the redirection itself
  */
-export default function OmniInstallAppButton({ appId, className }: { appId: string; className: string }) {
+export default function OmniInstallAppButton({
+  appId,
+  className,
+  returnTo,
+  teamId,
+}: {
+  appId: string;
+  className: string;
+  returnTo?: string;
+  teamId?: number;
+}) {
   const { t } = useLocale();
   const { data: app } = useApp(appId);
-  const utils = trpc.useContext();
+  const utils = trpc.useUtils();
 
   const mutation = useAddAppMutation(null, {
+    returnTo,
     onSuccess: (data) => {
       //TODO: viewer.appById might be replaced with viewer.apps so that a single query needs to be invalidated.
       utils.viewer.appById.invalidate({ appId });
-      utils.viewer.apps.invalidate({ extendsFeature: "EventType" });
+      utils.viewer.integrations.invalidate({
+        extendsFeature: "EventType",
+        ...(teamId && { teamId }),
+      });
       if (data?.setupPending) return;
       showToast(t("app_successfully_installed"), "success");
     },
@@ -36,26 +50,31 @@ export default function OmniInstallAppButton({ appId, className }: { appId: stri
   return (
     <InstallAppButton
       type={app.type}
-      isProOnly={app.isProOnly}
+      teamsPlanRequired={app.teamsPlanRequired}
       wrapperClassName={classNames("[@media(max-width:260px)]:w-full", className)}
       render={({ useDefaultComponent, ...props }) => {
         if (useDefaultComponent) {
           props = {
             ...props,
             onClick: () => {
-              mutation.mutate({ type: app.type, variant: app.variant, slug: app.slug, isOmniInstall: true });
+              mutation.mutate({
+                type: app.type,
+                variant: app.variant,
+                slug: app.slug,
+                ...(teamId && { teamId }),
+              });
             },
           };
         }
 
         return (
           <Button
-            loading={mutation.isLoading}
+            loading={mutation.isPending}
             color="secondary"
             className="[@media(max-width:260px)]:w-full [@media(max-width:260px)]:justify-center"
-            StartIcon={Icon.FiPlus}
+            StartIcon="plus"
             {...props}>
-            {t("install")}
+            {t("add")}
           </Button>
         );
       }}

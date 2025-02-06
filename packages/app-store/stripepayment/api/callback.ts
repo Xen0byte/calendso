@@ -1,18 +1,34 @@
-import { Prisma } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 import type { NextApiRequest, NextApiResponse } from "next";
 import { stringify } from "querystring";
 
-import prisma from "@calcom/prisma";
-
 import getInstalledAppPath from "../../_utils/getInstalledAppPath";
-import stripe, { StripeData } from "../lib/server";
+import createOAuthAppCredential from "../../_utils/oauth/createOAuthAppCredential";
+import { decodeOAuthState } from "../../_utils/oauth/decodeOAuthState";
+import type { StripeData } from "../lib/server";
+import stripe from "../lib/server";
+
+function getReturnToValueFromQueryState(req: NextApiRequest) {
+  let returnTo = "";
+  try {
+    returnTo = JSON.parse(`${req.query.state}`).returnTo;
+  } catch (error) {
+    console.info("No 'returnTo' in req.query.state");
+  }
+  return returnTo;
+}
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { code, error, error_description } = req.query;
+  const state = decodeOAuthState(req);
 
   if (error) {
+    // User cancels flow
+    if (error === "access_denied") {
+      state?.onErrorReturnTo ? res.redirect(state.onErrorReturnTo) : res.redirect("/apps/installed/payment");
+    }
     const query = stringify({ error, error_description });
-    res.redirect("/apps/installed?" + query);
+    res.redirect(`/apps/installed?${query}`);
     return;
   }
 
@@ -22,7 +38,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const response = await stripe.oauth.token({
     grant_type: "authorization_code",
-    code: code!.toString(),
+    code: code?.toString(),
   });
 
   const data: StripeData = { ...response, default_currency: "" };
@@ -31,14 +47,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     data["default_currency"] = account.default_currency;
   }
 
-  await prisma.credential.create({
-    data: {
-      type: "stripe_payment",
-      key: data as unknown as Prisma.InputJsonObject,
-      userId: req.session.user.id,
-      appId: "stripe",
-    },
-  });
+  await createOAuthAppCredential(
+    { appId: "stripe", type: "stripe_payment" },
+    data as unknown as Prisma.InputJsonObject,
+    req
+  );
 
-  res.redirect(getInstalledAppPath({ variant: "payment", slug: "stripe" }));
+  const returnTo = getReturnToValueFromQueryState(req);
+  res.redirect(returnTo || getInstalledAppPath({ variant: "payment", slug: "stripe" }));
 }

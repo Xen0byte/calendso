@@ -1,6 +1,7 @@
 import z from "zod";
 
-import Sendgrid, { SendgridNewContact } from "@calcom/lib/Sendgrid";
+import type { SendgridNewContact } from "@calcom/lib/Sendgrid";
+import Sendgrid from "@calcom/lib/Sendgrid";
 import { symmetricDecrypt } from "@calcom/lib/crypto";
 import logger from "@calcom/lib/logger";
 import type {
@@ -10,7 +11,7 @@ import type {
   IntegrationCalendar,
   NewCalendarEventType,
 } from "@calcom/types/Calendar";
-import { CredentialPayload } from "@calcom/types/Credential";
+import type { CredentialPayload } from "@calcom/types/Credential";
 
 const apiKeySchema = z.object({
   encrypted: z.string(),
@@ -32,7 +33,7 @@ export default class CloseComCalendarService implements Calendar {
 
   constructor(credential: CredentialPayload) {
     this.integrationName = "sendgrid_other_calendar";
-    this.log = logger.getChildLogger({ prefix: [`[[lib] ${this.integrationName}`] });
+    this.log = logger.getSubLogger({ prefix: [`[[lib] ${this.integrationName}`] });
 
     const parsedCredentialKey = apiKeySchema.safeParse(credential.key);
 
@@ -73,27 +74,28 @@ export default class CloseComCalendarService implements Calendar {
     });
   }
 
-  async updateEvent(uid: string, event: CalendarEvent): Promise<any> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  async updateEvent(_uid: string, _event: CalendarEvent): Promise<any> {
     // Unless we want to be able to support modifying an event to add more attendees
-    // to have them created in Sendgrid, ingoring this use case for now
+    // to have them created in Sendgrid, ignoring this use case for now
     return Promise.resolve();
   }
 
-  async deleteEvent(uid: string): Promise<void> {
+  async deleteEvent(_uid: string): Promise<void> {
     // Unless we want to delete the contact in Sendgrid once the event
-    // is deleted just ingoring this use case for now
+    // is deleted just ignoring this use case for now
     return Promise.resolve();
   }
 
   async getAvailability(
-    dateFrom: string,
-    dateTo: string,
-    selectedCalendars: IntegrationCalendar[]
+    _dateFrom: string,
+    _dateTo: string,
+    _selectedCalendars: IntegrationCalendar[]
   ): Promise<EventBusyDate[]> {
     return Promise.resolve([]);
   }
 
-  async listCalendars(event?: CalendarEvent): Promise<IntegrationCalendar[]> {
+  async listCalendars(_event?: CalendarEvent): Promise<IntegrationCalendar[]> {
     return Promise.resolve([]);
   }
 }

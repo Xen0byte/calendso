@@ -1,4 +1,4 @@
-import { Prisma } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 
 import prisma from "@calcom/prisma";
 
@@ -24,11 +24,11 @@ export const deleteAllBookingsByEmail = async (
   });
 
 export const deleteEventTypeByTitle = async (title: string) => {
-  const event = (await prisma.eventType.findFirst({
+  const event = await prisma.eventType.findFirst({
     select: { id: true },
     where: { title: title },
-  }))!;
-  await prisma.eventType.delete({ where: { id: event.id } });
+  });
+  await prisma.eventType.delete({ where: { id: event?.id } });
 };
 
 export const deleteAllWebhooksByEmail = async (email: string) => {

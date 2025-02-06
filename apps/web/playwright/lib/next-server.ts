@@ -1,5 +1,6 @@
 import detect from "detect-port";
-import { createServer, Server } from "http";
+import type { Server } from "http";
+import { createServer } from "http";
 import next from "next";
 import { parse } from "url";
 
@@ -22,7 +23,7 @@ export const nextServer = async ({ port = 3000 } = { port: 3000 }) => {
   process.env.PLAYWRIGHT_TEST_BASE_URL =
     process.env.NEXT_PUBLIC_WEBAPP_URL =
     process.env.NEXT_PUBLIC_WEBSITE_URL =
-      "http://localhost:" + port;
+      `http://localhost:${port}`;
   const app = next({
     dev: dev,
     port,
@@ -45,7 +46,7 @@ export const nextServer = async ({ port = 3000 } = { port: 3000 }) => {
       resolve(server);
     });
     server.on("error", (error) => {
-      if (error) throw new Error("Could not start Next.js server -" + error.message);
+      if (error) throw new Error(`Could not start Next.js server - ${error.message}`);
     });
   });
   return server;

@@ -1,4 +1,5 @@
-import ReactSelect, { components, GroupBase, InputProps, Props } from "react-select";
+import type { GroupBase, InputProps, Props } from "react-select";
+import ReactSelect, { components } from "react-select";
 
 import classNames from "@calcom/lib/classNames";
 
@@ -66,7 +67,7 @@ export function UnstyledSelect<
   Option,
   IsMulti extends boolean = false,
   Group extends GroupBase<Option> = GroupBase<Option>
->({ className, ...props }: SelectProps<Option, IsMulti, Group>) {
+>({ ...props }: SelectProps<Option, IsMulti, Group>) {
   return (
     <ReactSelect
       {...props}

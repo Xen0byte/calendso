@@ -1,11 +1,10 @@
 import React from "react";
-import { Props } from "react-select";
+import type { Props } from "react-select";
 
+import Select from "@calcom/features/form/components/Select";
 import { useLocale } from "@calcom/lib/hooks/useLocale";
+import { Avatar } from "@calcom/ui";
 import { Icon } from "@calcom/ui";
-
-import Avatar from "@components/ui/Avatar";
-import Select from "@components/ui/form/Select";
 
 type CheckedSelectOption = {
   avatar: string;
@@ -26,12 +25,6 @@ export const CheckedSelect = ({
   return (
     <>
       <Select
-        styles={{
-          option: (styles, { isDisabled }) => ({
-            ...styles,
-            backgroundColor: isDisabled ? "#F5F5F5" : "inherit",
-          }),
-        }}
         name={props.name}
         placeholder={props.placeholder || t("select")}
         isSearchable={false}
@@ -41,16 +34,18 @@ export const CheckedSelect = ({
         {...props}
       />
       {value.map((option) => (
-        <div key={option.value} className="border-1 border p-2 font-medium">
+        <div key={option.value} className="border p-2 font-medium">
           <Avatar
-            className="inline h-6 w-6 rounded-full ltr:mr-2 rtl:ml-2"
+            className="inline ltr:mr-2 rtl:ml-2"
+            size="sm"
             imageSrc={option.avatar}
             alt={option.label}
           />
           {option.label}
-          <Icon.FiX
+          <Icon
+            name="x"
             onClick={() => props.onChange(value.filter((item) => item.value !== option.value))}
-            className="float-right mt-0.5 h-5 w-5 cursor-pointer text-neutral-500"
+            className="text-subtle float-right mt-0.5 h-5 w-5 cursor-pointer"
           />
         </div>
       ))}

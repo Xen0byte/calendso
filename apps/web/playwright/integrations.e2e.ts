@@ -1,12 +1,14 @@
-import { expect, Page, Route } from "@playwright/test";
+import type { Page, Route } from "@playwright/test";
+import { expect } from "@playwright/test";
+import type { DefaultBodyType } from "msw";
 import { rest } from "msw";
 import { setupServer } from "msw/node";
 import { v4 as uuidv4 } from "uuid";
 
 import { prisma } from "@calcom/prisma";
 
-import { test } from "./lib/fixtures";
-import { todo } from "./lib/testUtils";
+import { test, todo } from "./lib/fixtures";
+import { submitAndWaitForJsonResponse } from "./lib/testUtils";
 
 declare let global: {
   E2E_EMAILS?: ({ text: string } | Record<string, unknown>)[];
@@ -41,7 +43,7 @@ const addOauthBasedIntegration = async function ({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     verify: (config: { requestHeaders: any; params: URLSearchParams; code: string }) => {
       status: number;
-      body: any;
+      body: DefaultBodyType;
     };
   };
 }) {
@@ -129,8 +131,10 @@ async function bookEvent(page: Page, calLink: string) {
   // --- fill form
   await page.fill('[name="name"]', "Integration User");
   await page.fill('[name="email"]', "integration-user@example.com");
-  await page.press('[name="email"]', "Enter");
-  const response = await page.waitForResponse("**/api/book/event");
+
+  const response = await submitAndWaitForJsonResponse(page, "**/api/book/event", {
+    action: () => page.press('[name="email"]', "Enter"),
+  });
   const responseObj = await response.json();
   const bookingId = responseObj.uid;
   await page.waitForSelector("[data-testid=success-page]");
@@ -158,6 +162,7 @@ test.afterEach(() => requestInterceptor.resetHandlers());
 
 // Disable API mocking after the tests are done.
 test.afterAll(() => requestInterceptor.close());
+test.afterEach(({ users }) => users.deleteAll());
 
 // TODO: Fix MSW mocking
 test.fixme("Integrations", () => {
@@ -209,20 +214,9 @@ test.fixme("Integrations", () => {
     });
   };
   test.describe("Zoom App", () => {
-    test.afterEach(async () => {
-      await prisma?.credential.deleteMany({
-        where: {
-          user: {
-            email: "pro@example.com",
-          },
-          type: "zoom_video",
-        },
-      });
-    });
-
     test("Can add integration", async ({ page, users }) => {
       const user = await users.create();
-      await user.login();
+      await user.apiLogin();
       await addZoomIntegration({ page });
       await page.waitForNavigation({
         url: (url) => {
@@ -234,7 +228,7 @@ test.fixme("Integrations", () => {
 
     test("can choose zoom as a location during booking", async ({ page, users }) => {
       const user = await users.create();
-      await user.login();
+      await user.apiLogin();
       const eventType = await addLocationIntegrationToFirstEvent({ user });
       await addZoomIntegration({ page });
       await page.waitForNavigation({
@@ -249,7 +243,7 @@ test.fixme("Integrations", () => {
       // POST https://api.zoom.us/v2/users/me/meetings
       // Verify       Header->  Authorization: "Bearer " + accessToken,
       /**
-         * {
+       * {
       topic: event.title,
       type: 2, // Means that this is a scheduled meeting
       start_time: event.startTime,
@@ -270,15 +264,15 @@ test.fixme("Integrations", () => {
         approval_type: 2,
         audio: "both",
         auto_recording: "none",
-        enforce_login: false,
+        enforce_apiLogin: false,
         registrants_email_notification: true,
       },
     };
-         */
+       */
     });
     test("Can disconnect from integration", async ({ page, users }) => {
       const user = await users.create();
-      await user.login();
+      await user.apiLogin();
       await addZoomIntegration({ page });
       await page.waitForNavigation({
         url: (url) => {
@@ -307,7 +301,7 @@ test.fixme("Integrations", () => {
   test.describe("Hubspot App", () => {
     test("Can add integration", async ({ page, users }) => {
       const user = await users.create();
-      await user.login();
+      await user.apiLogin();
       await addOauthBasedIntegration({
         page,
         slug: "hubspot",

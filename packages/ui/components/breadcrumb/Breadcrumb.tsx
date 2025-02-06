@@ -1,5 +1,7 @@
+"use client";
+
 import Link from "next/link";
-import { useRouter } from "next/router";
+import { usePathname } from "next/navigation";
 import { Children, Fragment, useEffect, useState } from "react";
 
 type BreadcrumbProps = {
@@ -23,8 +25,8 @@ export const Breadcrumb = ({ children }: BreadcrumbProps) => {
   });
 
   return (
-    <nav className="text-sm font-normal leading-5 text-gray-600">
-      <ol className="flex items-center space-x-2">{childrenSeperated}</ol>
+    <nav className="text-default text-sm font-normal leading-5">
+      <ol className="flex items-center space-x-2 rtl:space-x-reverse">{childrenSeperated}</ol>
     </nav>
   );
 };
@@ -38,21 +40,19 @@ type BreadcrumbItemProps = {
 export const BreadcrumbItem = ({ children, href, listProps }: BreadcrumbItemProps) => {
   return (
     <li {...listProps}>
-      <Link href={href}>
-        <a>{children}</a>
-      </Link>
+      <Link href={href}>{children}</Link>
     </li>
   );
 };
 
 export const BreadcrumbContainer = () => {
-  const router = useRouter();
-  const [breadcrumbs, setBreadcrumbs] = useState<{ href: string; label: string }[]>();
+  const pathname = usePathname();
+  const [, setBreadcrumbs] = useState<{ href: string; label: string }[]>();
 
   useEffect(() => {
-    const rawPath = router.asPath.split("?")[0]; // this will ignore any query params for now?
+    const rawPath = pathname; // Pathname doesn't include search params anymore
 
-    let pathArray = rawPath.split("/");
+    let pathArray = rawPath?.split("/") ?? [];
     pathArray.shift();
 
     pathArray = pathArray.filter((path) => path !== "");
@@ -65,7 +65,7 @@ export const BreadcrumbContainer = () => {
       };
     });
     setBreadcrumbs(allBreadcrumbs);
-  }, [router.asPath]);
+  }, [pathname]);
 };
 
 export default Breadcrumb;

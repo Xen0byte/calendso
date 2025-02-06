@@ -1,12 +1,14 @@
-import { GetServerSidePropsContext } from "next";
+import type { GetServerSidePropsContext } from "next";
 import { z } from "zod";
 
-import { PaymentData } from "@calcom/app-store/stripepayment/lib/server";
+import { getClientSecretFromPayment } from "@calcom/features/ee/payments/pages/getClientSecretFromPayment";
 import prisma from "@calcom/prisma";
+import { BookingStatus } from "@calcom/prisma/enums";
+import { paymentDataSelect } from "@calcom/prisma/selects/payment";
 import { EventTypeMetaDataSchema } from "@calcom/prisma/zod-utils";
 import type { inferSSRProps } from "@calcom/types/inferSSRProps";
 
-import { ssrInit } from "@server/lib/ssr";
+import { ssrInit } from "../../../../../apps/web/server/lib/ssr";
 
 export type PaymentPageProps = inferSSRProps<typeof getServerSideProps>;
 
@@ -22,86 +24,52 @@ export const getServerSideProps = async (context: GetServerSidePropsContext) => 
     where: {
       uid,
     },
-    select: {
-      data: true,
-      success: true,
-      uid: true,
-      refunded: true,
-      bookingId: true,
-      booking: {
-        select: {
-          id: true,
-          uid: true,
-          description: true,
-          title: true,
-          startTime: true,
-          attendees: {
-            select: {
-              email: true,
-              name: true,
-            },
-          },
-          eventTypeId: true,
-          location: true,
-          eventType: {
-            select: {
-              id: true,
-              title: true,
-              description: true,
-              length: true,
-              eventName: true,
-              requiresConfirmation: true,
-              userId: true,
-              metadata: true,
-              users: {
-                select: {
-                  name: true,
-                  username: true,
-                  hideBranding: true,
-                  theme: true,
-                },
-              },
-              team: {
-                select: {
-                  name: true,
-                  hideBranding: true,
-                },
-              },
-              price: true,
-              currency: true,
-            },
-          },
-        },
-      },
-    },
+    select: paymentDataSelect,
   });
 
-  if (!rawPayment) return { notFound: true };
+  if (!rawPayment) return { notFound: true } as const;
 
   const { data, booking: _booking, ...restPayment } = rawPayment;
+
   const payment = {
     ...restPayment,
-    data: data as unknown as PaymentData,
+    data: data as Record<string, unknown>,
   };
 
-  if (!_booking) return { notFound: true };
+  if (!_booking) return { notFound: true } as const;
 
-  const { startTime, eventType, ...restBooking } = _booking;
+  const { startTime, endTime, eventType, ...restBooking } = _booking;
   const booking = {
     ...restBooking,
     startTime: startTime.toString(),
+    endTime: endTime.toString(),
   };
 
-  if (!eventType) return { notFound: true };
+  if (!eventType) return { notFound: true } as const;
 
-  const [user] = eventType.users;
-  if (!user) return { notFound: true };
+  if (eventType.users.length === 0 && !!!eventType.team) return { notFound: true } as const;
 
+  const [user] = eventType?.users.length
+    ? eventType.users
+    : [{ name: null, theme: null, hideBranding: null, username: null }];
   const profile = {
     name: eventType.team?.name || user?.name || null,
     theme: (!eventType.team?.name && user?.theme) || null,
     hideBranding: eventType.team?.hideBranding || user?.hideBranding || null,
   };
+
+  if (
+    ([BookingStatus.CANCELLED, BookingStatus.REJECTED] as BookingStatus[]).includes(
+      booking.status as BookingStatus
+    )
+  ) {
+    return {
+      redirect: {
+        destination: `/booking/${booking.uid}`,
+        permanent: false,
+      },
+    };
+  }
 
   return {
     props: {
@@ -113,6 +81,7 @@ export const getServerSideProps = async (context: GetServerSidePropsContext) => 
       booking,
       trpcState: ssr.dehydrate(),
       payment,
+      clientSecret: getClientSecretFromPayment(payment),
       profile,
     },
   };

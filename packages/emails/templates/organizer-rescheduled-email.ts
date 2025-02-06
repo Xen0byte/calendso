@@ -1,41 +1,41 @@
+import { EMAIL_FROM_NAME } from "@calcom/lib/constants";
+import type { CalendarEvent, Person } from "@calcom/types/Calendar";
+
 import { renderEmail } from "../";
+import generateIcsFile, { GenerateIcsRole } from "../lib/generateIcsFile";
 import OrganizerScheduledEmail from "./organizer-scheduled-email";
 
 export default class OrganizerRescheduledEmail extends OrganizerScheduledEmail {
-  protected getNodeMailerPayload(): Record<string, unknown> {
-    const toAddresses = [this.calEvent.organizer.email];
-    if (this.calEvent.team) {
-      this.calEvent.team.members.forEach((member) => {
-        const memberAttendee = this.calEvent.attendees.find((attendee) => attendee.name === member);
-        if (memberAttendee) {
-          toAddresses.push(memberAttendee.email);
-        }
-      });
-    }
+  protected async getNodeMailerPayload(): Promise<Record<string, unknown>> {
+    const toAddresses = [this.teamMember?.email || this.calEvent.organizer.email];
 
     return {
-      icalEvent: {
-        filename: "event.ics",
-        content: this.getiCalEventAsString(),
-      },
-      from: `Cal.com <${this.getMailerOptions().from}>`,
-      to: toAddresses.join(","),
-      subject: `${this.calEvent.organizer.language.translate("event_type_has_been_rescheduled_on_time_date", {
-        eventType: this.calEvent.type,
-        name: this.calEvent.attendees[0].name,
-        date: `${this.getOrganizerStart("h:mma")} - ${this.getOrganizerEnd(
-          "h:mma"
-        )}, ${this.calEvent.organizer.language.translate(
-          this.getOrganizerStart("dddd").toLowerCase()
-        )}, ${this.calEvent.organizer.language.translate(
-          this.getOrganizerStart("MMMM").toLowerCase()
-        )} ${this.getOrganizerStart("D")}, ${this.getOrganizerStart("YYYY")}`,
-      })}`,
-      html: renderEmail("OrganizerRescheduledEmail", {
+      icalEvent: generateIcsFile({
         calEvent: this.calEvent,
-        attendee: this.calEvent.organizer,
+        role: GenerateIcsRole.ORGANIZER,
+        status: "CONFIRMED",
       }),
+      from: `${EMAIL_FROM_NAME} <${this.getMailerOptions().from}>`,
+      to: toAddresses.join(","),
+      replyTo: [this.calEvent.organizer.email, ...this.calEvent.attendees.map(({ email }) => email)],
+      subject: `${this.calEvent.organizer.language.translate("event_type_has_been_rescheduled_on_time_date", {
+        title: this.calEvent.title,
+        date: this.getFormattedDate(),
+      })}`,
+      html: await this.getHtml(
+        { ...this.calEvent, attendeeSeatId: undefined },
+        this.calEvent.organizer,
+        this.teamMember
+      ),
       text: this.getTextBody("event_has_been_rescheduled"),
     };
+  }
+
+  async getHtml(calEvent: CalendarEvent, attendee: Person, teamMember?: Person) {
+    return await renderEmail("OrganizerRescheduledEmail", {
+      calEvent,
+      attendee,
+      teamMember,
+    });
   }
 }

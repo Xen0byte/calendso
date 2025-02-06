@@ -1,4 +1,4 @@
-import { BookingStatus, Prisma } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 import type { NextApiRequest, NextApiResponse } from "next";
 import queue from "queue";
 
@@ -8,11 +8,19 @@ import { getErrorFromUnknown } from "@calcom/lib/errors";
 import { HttpError as HttpCode } from "@calcom/lib/http-error";
 import logger from "@calcom/lib/logger";
 import prisma from "@calcom/prisma";
+import { BookingStatus } from "@calcom/prisma/enums";
 
 import { Reschedule } from "../lib";
 import { initVitalClient, vitalEnv } from "../lib/client";
 
-// @Note: not being used anymore but left as example
+interface EventType {
+  event_type: string;
+  data: {
+    [key: string]: string | number;
+  };
+}
+
+/* @Note: not being used anymore but left as example
 const getOuraSleepScore = async (user_id: string, bedtime_start: Date) => {
   const vitalClient = await initVitalClient();
   if (!vitalClient) throw Error("Missing vital client");
@@ -22,6 +30,7 @@ const getOuraSleepScore = async (user_id: string, bedtime_start: Date) => {
   }
   return +sleep_data.sleep[0].data.score;
 };
+*/
 
 /**
  * This is will generate a user token for a client_user_id`
@@ -45,11 +54,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const payload = JSON.stringify(req.body);
 
-    const event: any = vitalClient.Webhooks.constructWebhookEvent(
+    const event: EventType = vitalClient.Webhooks.constructWebhookEvent(
       payload,
       req.headers as Record<string, string>,
       vitalEnv.webhook_secret as string
-    );
+    ) as EventType;
 
     if (event.event_type == "daily.data.sleep.created") {
       // Carry out logic here to determine what to do if sleep is less
@@ -95,7 +104,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             res.status(500).json({ message: "Selected param not available" });
             return;
           }
-          const totalHoursSleep = event.data[parameterFilter] / 60 / 60;
+          const totalHoursSleep = Number(event.data[parameterFilter]) / 60 / 60;
 
           if (minimumSleepTime > 0 && parameterFilter !== "" && totalHoursSleep <= minimumSleepTime) {
             // Trigger reschedule

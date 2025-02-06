@@ -1,27 +1,21 @@
+import { EMAIL_FROM_NAME } from "@calcom/lib/constants";
+
 import { renderEmail } from "../";
 import OrganizerRequestEmail from "./organizer-request-email";
 
 export default class OrganizerRequestReminderEmail extends OrganizerRequestEmail {
-  protected getNodeMailerPayload(): Record<string, unknown> {
-    const toAddresses = [this.calEvent.organizer.email];
-    if (this.calEvent.team) {
-      this.calEvent.team.members.forEach((member) => {
-        const memberAttendee = this.calEvent.attendees.find((attendee) => attendee.name === member);
-        if (memberAttendee) {
-          toAddresses.push(memberAttendee.email);
-        }
-      });
-    }
+  protected async getNodeMailerPayload(): Promise<Record<string, unknown>> {
+    const toAddresses = [this.teamMember?.email || this.calEvent.organizer.email];
 
     return {
-      from: `Cal.com <${this.getMailerOptions().from}>`,
+      from: `${EMAIL_FROM_NAME} <${this.getMailerOptions().from}>`,
       to: toAddresses.join(","),
+      replyTo: [this.calEvent.organizer.email, ...this.calEvent.attendees.map(({ email }) => email)],
       subject: `${this.t("event_awaiting_approval_subject", {
-        eventType: this.calEvent.type,
-        name: this.calEvent.attendees[0].name,
+        title: this.calEvent.title,
         date: this.getFormattedDate(),
       })}`,
-      html: renderEmail("OrganizerRequestReminderEmail", {
+      html: await renderEmail("OrganizerRequestReminderEmail", {
         calEvent: this.calEvent,
         attendee: this.calEvent.organizer,
       }),

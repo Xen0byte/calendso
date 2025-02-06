@@ -1,14 +1,14 @@
-import { IdentityProvider } from "@prisma/client";
 import type { NextApiRequest, NextApiResponse } from "next";
 
+import { ErrorCode } from "@calcom/features/auth/lib/ErrorCode";
+import { getServerSession } from "@calcom/features/auth/lib/getServerSession";
+import { hashPassword } from "@calcom/features/auth/lib/hashPassword";
+import { verifyPassword } from "@calcom/features/auth/lib/verifyPassword";
 import prisma from "@calcom/prisma";
-
-import { getSession } from "@lib/auth";
-
-import { ErrorCode, hashPassword, verifyPassword } from "../../../lib/auth";
+import { IdentityProvider } from "@calcom/prisma/enums";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const session = await getSession({ req: req });
+  const session = await getServerSession({ req });
 
   if (!session || !session.user || !session.user.email) {
     res.status(401).json({ message: "Not authenticated" });
@@ -38,7 +38,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const oldPassword = req.body.oldPassword;
   const newPassword = req.body.newPassword;
 
-  const currentPassword = user.password;
+  const currentPassword = user.password?.hash;
   if (!currentPassword) {
     return res.status(400).json({ error: ErrorCode.UserMissingPassword });
   }
@@ -53,12 +53,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const hashedPassword = await hashPassword(newPassword);
-  await prisma.user.update({
+  await prisma.userPassword.upsert({
     where: {
-      id: user.id,
+      userId: user.id,
     },
-    data: {
-      password: hashedPassword,
+    create: {
+      hash: hashedPassword,
+      userId: user.id,
+    },
+    update: {
+      hash: hashedPassword,
     },
   });
 

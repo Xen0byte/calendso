@@ -1,30 +1,22 @@
+import { EMAIL_FROM_NAME } from "@calcom/lib/constants";
+import type { CalendarEvent, Person } from "@calcom/types/Calendar";
+
 import { renderEmail } from "../";
 import AttendeeScheduledEmail from "./attendee-scheduled-email";
 
 export default class AttendeeRequestEmail extends AttendeeScheduledEmail {
-  protected getNodeMailerPayload(): Record<string, unknown> {
-    const toAddresses = [this.calEvent.attendees[0].email];
-    if (this.calEvent.team) {
-      this.calEvent.team.members.forEach((member) => {
-        const memberAttendee = this.calEvent.attendees.find((attendee) => attendee.name === member);
-        if (memberAttendee) {
-          toAddresses.push(memberAttendee.email);
-        }
-      });
-    }
+  protected async getNodeMailerPayload(): Promise<Record<string, unknown>> {
+    const toAddresses = this.calEvent.attendees.map((attendee) => attendee.email);
 
     return {
-      from: `Cal.com <${this.getMailerOptions().from}>`,
+      from: `${EMAIL_FROM_NAME} <${this.getMailerOptions().from}>`,
       to: toAddresses.join(","),
+      replyTo: [...this.calEvent.attendees.map(({ email }) => email), this.calEvent.organizer.email],
       subject: `${this.calEvent.attendees[0].language.translate("booking_submitted_subject", {
-        eventType: this.calEvent.type,
-        name: this.calEvent.team?.name || this.calEvent.organizer.name,
+        title: this.calEvent.title,
         date: this.getFormattedDate(),
       })}`,
-      html: renderEmail("AttendeeRequestEmail", {
-        calEvent: this.calEvent,
-        attendee: this.attendee,
-      }),
+      html: await this.getHtmlRequestEmail(this.calEvent, this.attendee),
       text: this.getTextBody(
         this.calEvent.attendees[0].language.translate("booking_submitted", {
           name: this.calEvent.attendees[0].name,
@@ -34,5 +26,12 @@ export default class AttendeeRequestEmail extends AttendeeScheduledEmail {
         })
       ),
     };
+  }
+
+  async getHtmlRequestEmail(calEvent: CalendarEvent, attendee: Person) {
+    return await renderEmail("AttendeeRequestEmail", {
+      calEvent,
+      attendee,
+    });
   }
 }

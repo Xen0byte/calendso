@@ -1,17 +1,17 @@
-import { NextApiRequest, NextApiResponse } from "next";
-import { authenticator } from "otplib";
+import type { NextApiRequest, NextApiResponse } from "next";
 
+import { ErrorCode } from "@calcom/features/auth/lib/ErrorCode";
+import { getServerSession } from "@calcom/features/auth/lib/getServerSession";
 import { symmetricDecrypt } from "@calcom/lib/crypto";
+import { totpAuthenticatorCheck } from "@calcom/lib/totp";
 import prisma from "@calcom/prisma";
-
-import { ErrorCode, getSession } from "@lib/auth";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") {
     return res.status(405).json({ message: "Method not allowed" });
   }
 
-  const session = await getSession({ req });
+  const session = await getServerSession({ req });
   if (!session) {
     return res.status(401).json({ message: "Not authenticated" });
   }
@@ -48,7 +48,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ error: ErrorCode.InternalServerError });
   }
 
-  const isValidToken = authenticator.check(req.body.code, secret);
+  const isValidToken = totpAuthenticatorCheck(req.body.code, secret);
   if (!isValidToken) {
     return res.status(400).json({ error: ErrorCode.IncorrectTwoFactorCode });
   }

@@ -1,52 +1,71 @@
-import { TFunction } from "next-i18next";
+import type { TFunction } from "next-i18next";
 import { RRule } from "rrule";
 
 import dayjs from "@calcom/dayjs";
+// TODO: Use browser locale, implement Intl in Dayjs maybe?
+import "@calcom/dayjs/locales";
 import { getEveryFreqFor } from "@calcom/lib/recurringStrings";
-import type { CalendarEvent } from "@calcom/types/Calendar";
+import type { TimeFormat } from "@calcom/lib/timeFormat";
+import type { CalendarEvent, Person } from "@calcom/types/Calendar";
 import type { RecurringEvent } from "@calcom/types/Calendar";
 
 import { Info } from "./Info";
 
-function getRecurringWhen({ calEvent }: { calEvent: CalendarEvent }) {
-  if (calEvent.recurringEvent) {
-    const t = calEvent.attendees[0].language.translate;
-    const rruleOptions = new RRule(calEvent.recurringEvent).options;
-    const recurringEvent: RecurringEvent = {
+export function getRecurringWhen({
+  recurringEvent,
+  attendee,
+}: {
+  recurringEvent?: RecurringEvent | null;
+  attendee: Pick<Person, "language">;
+}) {
+  if (recurringEvent) {
+    const t = attendee.language.translate;
+    const rruleOptions = new RRule(recurringEvent).options;
+    const recurringEventConfig: RecurringEvent = {
       freq: rruleOptions.freq,
       count: rruleOptions.count || 1,
       interval: rruleOptions.interval,
     };
-    return ` - ${getEveryFreqFor({ t, recurringEvent })}`;
+    return `${getEveryFreqFor({ t, recurringEvent: recurringEventConfig })}`;
   }
   return "";
 }
 
-export function WhenInfo(props: { calEvent: CalendarEvent; timeZone: string; t: TFunction }) {
-  const { timeZone, t, calEvent: { recurringEvent } = {} } = props;
+export function WhenInfo(props: {
+  calEvent: CalendarEvent;
+  timeZone: string;
+  t: TFunction;
+  locale: string;
+  timeFormat: TimeFormat;
+}) {
+  const { timeZone, t, calEvent: { recurringEvent } = {}, locale, timeFormat } = props;
 
   function getRecipientStart(format: string) {
-    return dayjs(props.calEvent.startTime).tz(timeZone).format(format);
+    return dayjs(props.calEvent.startTime).tz(timeZone).locale(locale).format(format);
   }
 
   function getRecipientEnd(format: string) {
-    return dayjs(props.calEvent.endTime).tz(timeZone).format(format);
+    return dayjs(props.calEvent.endTime).tz(timeZone).locale(locale).format(format);
   }
+
+  const recurringInfo = getRecurringWhen({
+    recurringEvent: props.calEvent.recurringEvent,
+    attendee: props.calEvent.attendees[0],
+  });
 
   return (
     <div>
       <Info
-        label={`${t("when")} ${getRecurringWhen(props)}`}
+        label={`${t("when")} ${recurringInfo !== "" ? ` - ${recurringInfo}` : ""}`}
         lineThrough={
           !!props.calEvent.cancellationReason && !props.calEvent.cancellationReason.includes("$RCH$")
         }
         description={
-          <>
+          <span data-testid="when">
             {recurringEvent?.count ? `${t("starting")} ` : ""}
-            {t(getRecipientStart("dddd").toLowerCase())}, {t(getRecipientStart("MMMM").toLowerCase())}{" "}
-            {getRecipientStart("D, YYYY | h:mma")} - {getRecipientEnd("h:mma")}{" "}
-            <span style={{ color: "#888888" }}>({timeZone})</span>
-          </>
+            {getRecipientStart(`dddd, LL | ${timeFormat}`)} - {getRecipientEnd(timeFormat)}{" "}
+            <span style={{ color: "#4B5563" }}>({timeZone})</span>
+          </span>
         }
         withSpacer
       />

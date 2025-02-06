@@ -1,4 +1,4 @@
-import { Prisma } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 import type { NextApiRequest, NextApiResponse } from "next";
 
 import { WEBAPP_URL } from "@calcom/lib/constants";
@@ -45,7 +45,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const token = await vitalClient.Link.create(
       userVital?.user_id,
       undefined,
-      WEBAPP_URL + "/api/integrations/vital/callback"
+      `${WEBAPP_URL}/api/integrations/vital/callback`
     );
     return res.status(200).json({
       token: token.link_token,

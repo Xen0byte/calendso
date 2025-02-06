@@ -2,20 +2,20 @@ import Link from "next/link";
 import { Fragment } from "react";
 
 import { availabilityAsString } from "@calcom/lib/availability";
-import classNames from "@calcom/lib/classNames";
 import { useLocale } from "@calcom/lib/hooks/useLocale";
-import { Availability } from "@calcom/prisma/client";
-import { RouterOutputs } from "@calcom/trpc/react";
+import { sortAvailabilityStrings } from "@calcom/lib/weekstart";
+import type { RouterOutputs } from "@calcom/trpc/react";
 import { trpc } from "@calcom/trpc/react";
-import { Schedule } from "@calcom/types/schedule";
 import {
   Badge,
   Button,
   Dropdown,
+  DropdownItem,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
   Icon,
+  showToast,
 } from "@calcom/ui";
 
 export function ScheduleListItem({
@@ -23,100 +23,124 @@ export function ScheduleListItem({
   deleteFunction,
   displayOptions,
   updateDefault,
+  isDeletable,
+  duplicateFunction,
 }: {
   schedule: RouterOutputs["viewer"]["availability"]["list"]["schedules"][number];
   deleteFunction: ({ scheduleId }: { scheduleId: number }) => void;
   displayOptions?: {
     timeZone?: string;
     hour12?: boolean;
+    weekStart?: string;
   };
-  updateDefault: ({
-    scheduleId,
-    isDefault,
-    schedule,
-  }: {
-    scheduleId: number;
-    isDefault: boolean;
-    schedule: Schedule;
-  }) => void;
+  isDeletable: boolean;
+  updateDefault: ({ scheduleId, isDefault }: { scheduleId: number; isDefault: boolean }) => void;
+  duplicateFunction: ({ scheduleId }: { scheduleId: number }) => void;
 }) {
   const { t, i18n } = useLocale();
 
-  const { data, isLoading } = trpc.viewer.availability.schedule.get.useQuery({ scheduleId: schedule.id });
+  const { data, isPending } = trpc.viewer.availability.schedule.get.useQuery({ scheduleId: schedule.id });
 
   return (
     <li key={schedule.id}>
-      <div className="flex items-center justify-between py-5 hover:bg-neutral-50 ltr:pl-4 rtl:pr-4 sm:ltr:pl-0 sm:rtl:pr-0">
-        <div className="group flex w-full items-center justify-between hover:bg-neutral-50 sm:px-6">
-          <Link href={"/availability/" + schedule.id}>
-            <a className="flex-grow truncate text-sm" title={schedule.name}>
-              <div className="space-x-2">
-                <span className="truncate font-medium text-neutral-900">{schedule.name}</span>
-                {schedule.isDefault && (
-                  <Badge variant="success" className="text-xs">
-                    {t("default")}
-                  </Badge>
-                )}
-              </div>
-              <p className="mt-1 text-xs text-neutral-500">
-                {schedule.availability.map((availability: Availability) => (
-                  <Fragment key={availability.id}>
-                    {availabilityAsString(availability, {
-                      locale: i18n.language,
-                      hour12: displayOptions?.hour12,
-                    })}
+      <div className="hover:bg-muted flex items-center justify-between py-5 transition ltr:pl-4 rtl:pr-4 sm:ltr:pl-0 sm:rtl:pr-0">
+        <div className="group flex w-full items-center justify-between sm:px-6">
+          <Link
+            href={`/availability/${schedule.id}`}
+            className="flex-grow truncate text-sm"
+            title={schedule.name}>
+            <div className="space-x-2 rtl:space-x-reverse">
+              <span className="text-emphasis truncate font-medium">{schedule.name}</span>
+              {schedule.isDefault && (
+                <Badge variant="success" className="text-xs">
+                  {t("default")}
+                </Badge>
+              )}
+            </div>
+            <p className="text-subtle mt-1">
+              {schedule.availability
+                .filter((availability) => !!availability.days.length)
+                .map((availability) =>
+                  availabilityAsString(availability, {
+                    locale: i18n.language,
+                    hour12: displayOptions?.hour12,
+                  })
+                )
+                // sort the availability strings as per user's weekstart (settings)
+                .sort(sortAvailabilityStrings(i18n.language, displayOptions?.weekStart))
+                .map((availabilityString, index) => (
+                  <Fragment key={index}>
+                    {availabilityString}
                     <br />
                   </Fragment>
                 ))}
-                {schedule.timeZone && schedule.timeZone !== displayOptions?.timeZone && (
-                  <p className="my-1 flex items-center first-letter:text-xs">
-                    <Icon.FiGlobe />
-                    &nbsp;{schedule.timeZone}
-                  </p>
-                )}
-              </p>
-            </a>
+              {(schedule.timeZone || displayOptions?.timeZone) && (
+                <p className="my-1 flex items-center first-letter:text-xs">
+                  <Icon name="globe" className="h-3.5 w-3.5" />
+                  &nbsp;{schedule.timeZone ?? displayOptions?.timeZone}
+                </p>
+              )}
+            </p>
           </Link>
         </div>
         <Dropdown>
-          <DropdownMenuTrigger asChild className="mr-5">
-            <Button type="button" size="icon" color="secondary" StartIcon={Icon.FiMoreHorizontal} />
+          <DropdownMenuTrigger asChild>
+            <Button
+              data-testid="schedule-more"
+              className="mx-5"
+              type="button"
+              variant="icon"
+              color="secondary"
+              StartIcon="ellipsis"
+            />
           </DropdownMenuTrigger>
-          {!isLoading && data && (
+          {!isPending && data && (
             <DropdownMenuContent>
-              <DropdownMenuItem className="min-w-40 focus:ring-gray-100">
+              <DropdownMenuItem className="min-w-40 focus:ring-muted">
                 {!schedule.isDefault && (
-                  <Button
+                  <DropdownItem
                     type="button"
-                    color="minimal"
-                    className="w-full rounded-b-none border-none font-normal"
-                    disabled={schedule.isDefault}
+                    StartIcon="star"
                     onClick={() => {
                       updateDefault({
                         scheduleId: schedule.id,
                         isDefault: true,
-                        schedule: data.availability,
                       });
                     }}>
                     {t("set_as_default")}
-                  </Button>
+                  </DropdownItem>
                 )}
               </DropdownMenuItem>
-              <DropdownMenuItem className="min-w-40 focus:ring-gray-100">
-                <Button
+              <DropdownMenuItem className="outline-none">
+                <DropdownItem
+                  type="button"
+                  data-testid={`schedule-duplicate${schedule.id}`}
+                  StartIcon="copy"
                   onClick={() => {
-                    deleteFunction({
+                    duplicateFunction({
                       scheduleId: schedule.id,
                     });
-                  }}
+                  }}>
+                  {t("duplicate")}
+                </DropdownItem>
+              </DropdownMenuItem>
+              <DropdownMenuItem className="min-w-40 focus:ring-muted">
+                <DropdownItem
                   type="button"
                   color="destructive"
-                  className={classNames(
-                    "w-full border-none font-normal",
-                    !schedule.isDefault && "rounded-t-none"
-                  )}>
+                  StartIcon="trash"
+                  data-testid="delete-schedule"
+                  onClick={() => {
+                    if (!isDeletable) {
+                      showToast(t("requires_at_least_one_schedule"), "error");
+                    } else {
+                      deleteFunction({
+                        scheduleId: schedule.id,
+                      });
+                    }
+                  }}>
                   {t("delete")}
-                </Button>
+                </DropdownItem>
               </DropdownMenuItem>
             </DropdownMenuContent>
           )}

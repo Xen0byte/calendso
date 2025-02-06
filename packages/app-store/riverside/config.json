@@ -3,13 +3,21 @@
   "name": "Riverside",
   "slug": "riverside",
   "type": "riverside_video",
-  "imageSrc": "/api/app-store/riverside/icon-dark.svg",
-  "logo": "/api/app-store/riverside/icon-dark.svg",
-  "url": "https://cal.com/apps/riverside",
+  "logo": "icon-dark.svg",
+  "url": "https://cal.com/",
   "variant": "conferencing",
-  "categories": ["video"],
-  "publisher": "Cal.com",
+  "categories": ["conferencing"],
+  "publisher": "Cal.com, Inc.",
   "email": "help@cal.com",
   "description": "Your online recording studio. The easiest way to record podcasts and videos in studio quality from anywhere. All from the browser.",
-  "__createdUsingCli": true
+  "__createdUsingCli": true,
+  "appData": {
+    "location": {
+      "label": "Riverside Video",
+      "urlRegExp": "^http(s)?:\\/\\/(www\\.)?riverside.fm\\/studio\\/[a-zA-Z0-9]*",
+      "type": "integrations:riverside_video",
+      "linkType": "static"
+    }
+  },
+  "isOAuth": false
 }

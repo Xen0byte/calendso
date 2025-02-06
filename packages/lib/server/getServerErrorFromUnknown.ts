@@ -1,8 +1,15 @@
-import { PrismaClientKnownRequestError, NotFoundError } from "@prisma/client/runtime";
+import { Prisma } from "@prisma/client";
 import Stripe from "stripe";
-import { ZodError, ZodIssue } from "zod";
+import type { ZodIssue } from "zod";
+import { ZodError } from "zod";
+
+import { ErrorCode } from "@calcom/lib/errorCodes";
+
+import { TRPCError } from "@trpc/server";
+import { getHTTPStatusCodeFromError } from "@trpc/server/http";
 
 import { HttpError } from "../http-error";
+import { redactError } from "../redactError";
 
 function hasName(cause: unknown): cause is { name: string } {
   return !!cause && typeof cause === "object" && "name" in cause;
@@ -10,6 +17,10 @@ function hasName(cause: unknown): cause is { name: string } {
 
 function isZodError(cause: unknown): cause is ZodError {
   return cause instanceof ZodError || (hasName(cause) && cause.name === "ZodError");
+}
+
+function isPrismaError(cause: unknown): cause is Prisma.PrismaClientKnownRequestError {
+  return cause instanceof Prisma.PrismaClientKnownRequestError;
 }
 
 function parseZodErrorIssues(issues: ZodIssue[]): string {
@@ -25,8 +36,11 @@ function parseZodErrorIssues(issues: ZodIssue[]): string {
 }
 
 export function getServerErrorFromUnknown(cause: unknown): HttpError {
+  if (cause instanceof TRPCError) {
+    const statusCode = getHTTPStatusCodeFromError(cause);
+    return new HttpError({ statusCode, message: cause.message });
+  }
   if (isZodError(cause)) {
-    console.log("cause", cause);
     return new HttpError({
       statusCode: 400,
       message: parseZodErrorIssues(cause.issues),
@@ -39,20 +53,27 @@ export function getServerErrorFromUnknown(cause: unknown): HttpError {
       message: "Unexpected error, please reach out for our customer support.",
     });
   }
-  if (cause instanceof PrismaClientKnownRequestError) {
-    return new HttpError({ statusCode: 400, message: cause.message, cause });
-  }
-  if (cause instanceof NotFoundError) {
-    return new HttpError({ statusCode: 404, message: cause.message, cause });
+  if (isPrismaError(cause)) {
+    return getServerErrorFromPrismaError(cause);
   }
   if (cause instanceof Stripe.errors.StripeInvalidRequestError) {
-    return new HttpError({ statusCode: 400, message: cause.message, cause });
+    return getHttpError({ statusCode: 400, cause });
   }
   if (cause instanceof HttpError) {
-    return cause;
+    const redactedCause = redactError(cause);
+    return {
+      ...redactedCause,
+      name: cause.name,
+      message: cause.message ?? "",
+      cause: cause.cause,
+      url: cause.url,
+      statusCode: cause.statusCode,
+      method: cause.method,
+    };
   }
   if (cause instanceof Error) {
-    return new HttpError({ statusCode: 500, message: cause.message, cause });
+    const statusCode = getStatusCode(cause);
+    return getHttpError({ statusCode, cause });
   }
   if (typeof cause === "string") {
     // @ts-expect-error https://github.com/tc39/proposal-error-cause
@@ -63,4 +84,44 @@ export function getServerErrorFromUnknown(cause: unknown): HttpError {
     statusCode: 500,
     message: `Unhandled error of type '${typeof cause}'. Please reach out for our customer support.`,
   });
+}
+
+function getStatusCode(cause: Error): number {
+  switch (cause.message) {
+    case ErrorCode.RequestBodyWithouEnd:
+    case ErrorCode.MissingPaymentCredential:
+    case ErrorCode.MissingPaymentAppId:
+    case ErrorCode.AvailabilityNotFoundInSchedule:
+      return 400;
+    case ErrorCode.CancelledBookingsCannotBeRescheduled:
+      return 403;
+    case ErrorCode.NoAvailableUsersFound:
+    case ErrorCode.HostsUnavailableForBooking:
+    case ErrorCode.PaymentCreationFailure:
+    case ErrorCode.ChargeCardFailure:
+    case ErrorCode.AlreadySignedUpForBooking:
+    case ErrorCode.BookingSeatsFull:
+    case ErrorCode.NotEnoughAvailableSeats:
+      return 409;
+    case ErrorCode.EventTypeNotFound:
+    case ErrorCode.BookingNotFound:
+      return 404;
+    case ErrorCode.UnableToSubscribeToThePlatform:
+    case ErrorCode.UpdatingOauthClientError:
+    case ErrorCode.CreatingOauthClientError:
+    default:
+      return 500;
+  }
+}
+
+function getHttpError<T extends Error>({ statusCode, cause }: { statusCode: number; cause: T }) {
+  const redacted = redactError(cause);
+  return new HttpError({ statusCode, message: redacted.message, cause: redacted });
+}
+
+function getServerErrorFromPrismaError(cause: Prisma.PrismaClientKnownRequestError) {
+  if (cause.code === "P2025") {
+    return getHttpError({ statusCode: 404, cause });
+  }
+  return getHttpError({ statusCode: 400, cause });
 }

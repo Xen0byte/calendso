@@ -1,6 +1,7 @@
+import { useAutoAnimate } from "@formkit/auto-animate/react";
 import { useMemo } from "react";
 
-import { classNames } from "@calcom/lib";
+import { classNames as cs } from "@calcom/lib";
 import { HorizontalTabs, VerticalTabs } from "@calcom/ui";
 
 import getAppCategories from "../_utils/getAppCategories";
@@ -10,23 +11,36 @@ const AppCategoryNavigation = ({
   children,
   containerClassname,
   className,
+  classNames,
+  useQueryParam = false,
 }: {
   baseURL: string;
   children: React.ReactNode;
-  containerClassname: string;
+  /** @deprecated use classNames instead */
+  containerClassname?: string;
+  /** @deprecated use classNames instead */
   className?: string;
+  classNames?: {
+    root?: string;
+    container?: string;
+    verticalTabsItem?: string;
+  };
+  useQueryParam?: boolean;
 }) => {
-  const appCategories = useMemo(() => getAppCategories(baseURL), [baseURL]);
+  const [animationRef] = useAutoAnimate<HTMLDivElement>();
+  const appCategories = useMemo(() => getAppCategories(baseURL, useQueryParam), [baseURL, useQueryParam]);
 
   return (
-    <div className={classNames("flex flex-col p-2 md:p-0 xl:flex-row", className)}>
+    <div className={cs("flex flex-col gap-x-6 md:p-0 xl:flex-row", classNames?.root ?? className)}>
       <div className="hidden xl:block">
-        <VerticalTabs tabs={appCategories} sticky linkProps={{ shallow: true }} />
+        <VerticalTabs tabs={appCategories} sticky linkShallow itemClassname={classNames?.verticalTabsItem} />
       </div>
       <div className="block overflow-x-scroll xl:hidden">
-        <HorizontalTabs tabs={appCategories} linkProps={{ shallow: true }} />
+        <HorizontalTabs tabs={appCategories} linkShallow />
       </div>
-      <main className={containerClassname}>{children}</main>
+      <main className={classNames?.container ?? containerClassname} ref={animationRef}>
+        {children}
+      </main>
     </div>
   );
 };
